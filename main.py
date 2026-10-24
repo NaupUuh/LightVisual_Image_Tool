@@ -9,6 +9,7 @@ import json
 import os
 import queue
 import random
+import re
 import sys
 import threading
 import time
@@ -17,7 +18,7 @@ import traceback
 import webbrowser
 from tkinter import filedialog, messagebox, ttk
 
-APP_VERSION = "1.0.4"
+APP_VERSION = "1.0.5"
 APP_TEN = "LightVisual Image Tool"
 
 THU_MUC_GOC = os.path.dirname(os.path.abspath(__file__))
@@ -758,6 +759,32 @@ class App(tk.Tk):
             self.ui_q.put(("log", "Không xoá được %s (%s)" % (os.path.basename(p), e)))
         self.ui_q.put(("dem_tc", None))
 
+    @staticmethod
+    def _tao_thu_muc_prompt(goc, so, prompt):
+        """Tạo (hoặc dùng lại) thư mục con 'NN_<prompt>' cho 1 prompt.
+
+        Đánh số tăng dần, không nhảy số: nếu thư mục của prompt này đã có từ lượt
+        trước thì dùng lại đúng thư mục đó (dồn video mới vào cùng chỗ).
+        """
+        ten = api.ten_an_toan(prompt, 40)
+        os.makedirs(goc, exist_ok=True)
+        try:
+            co_san = sorted(d for d in os.listdir(goc)
+                            if os.path.isdir(os.path.join(goc, d)) and
+                            re.match(r"^\d{2,}_", d))
+        except Exception:
+            co_san = []
+        for d in co_san:                      # prompt này đã có thư mục → dùng lại
+            if d.split("_", 1)[1] == ten:
+                return os.path.join(goc, d)
+        while True:
+            d = "%02d_%s" % (so, ten)
+            p = os.path.join(goc, d)
+            if not os.path.exists(p):
+                os.makedirs(p, exist_ok=True)
+                return p
+            so += 1                           # trùng tên khác prompt → nhảy số
+
     def _cap_nhat_dem_khung(self):
         self.lbl_khung.configure(text="%d ảnh" % self.lst_khung.size())
         self._cap_nhat_phi_video()
@@ -1379,6 +1406,7 @@ class App(tk.Tk):
         ds_pa = self._ds_prompt_anh()
         ds_mc = self._ds_mc()
         ds_tc = self._ds_tham_chieu() if self._dang_chon_tham_chieu() else []
+        ds_goc = []
 
         # kiểm tra đầu vào theo nguồn
         if nguon == api.DS_NGUON[1]:
@@ -1481,6 +1509,21 @@ class App(tk.Tk):
             for v in viec:
                 v["mc"] = ""
 
+        for v in viec:
+            g = v.get("prompt_goc") or v["prompt"]
+            if g not in ds_goc:
+                ds_goc.append(g)
+        if len(ds_goc) > 1:
+            ban_do = {}
+            for k, g in enumerate(ds_goc):
+                ban_do[g] = self._tao_thu_muc_prompt(thu_muc, k + 1, g)
+            for v in viec:
+                v["thu_muc"] = ban_do[v.get("prompt_goc") or v["prompt"]]
+            self._log("Chia %d video vào %d thư mục con (mỗi prompt 1 thư mục):" %
+                      (len(viec), len(ds_goc)))
+            for g in ds_goc:
+                self._log("   %s" % os.path.basename(ban_do[g]))
+
         for i in self.tree.get_children():
             self.tree.delete(i)
         self.ket_qua = []
@@ -1544,7 +1587,7 @@ class App(tk.Tk):
             if not kq.get("anh"):
                 raise api.LoiAPI("Không tạo được ảnh khung.", 0, "empty")
             url, b64 = kq["anh"][0]
-            thu_khung = os.path.join(ch["thu_muc"], "_khung")
+            thu_khung = os.path.join(v.get("thu_muc") or ch["thu_muc"], "_khung")
             os.makedirs(thu_khung, exist_ok=True)
             khung = os.path.join(thu_khung, "%03d_%s.png" %
                                  (v["stt"], api.ten_an_toan(v["prompt_anh"])))
@@ -1562,7 +1605,9 @@ class App(tk.Tk):
                                   bao=lambda s: self.ui_q.put(
                                       ("log", "[%d] %s" % (v["stt"], s))))
         ten = "%03d_%s_%d" % (v["stt"], api.ten_an_toan(v["prompt"]), v["lan"])
-        duong_dan = os.path.join(ch["thu_muc"], ten + ".mp4")
+        thu_ra = v.get("thu_muc") or ch["thu_muc"]
+        os.makedirs(thu_ra, exist_ok=True)
+        duong_dan = os.path.join(thu_ra, ten + ".mp4")
         n = api.tai_video(key, job_id, xong.get("url"), duong_dan)
         return duong_dan, n
 

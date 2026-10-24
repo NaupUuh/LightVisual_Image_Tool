@@ -25,6 +25,14 @@ MP4 = (b"\x00\x00\x00\x20ftypisom\x00\x00\x02\x00isomiso2avc1mp41"
 ANH = (b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01"
        b"\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\nIDATx\x9cc\x00"
        b"\x01\x00\x00\x05\x00\x01\r\n-\xb4\x00\x00\x00\x00IEND\xaeB`\x82")
+def dem_mp4(goc):
+    """Đếm mp4 trong cả thư mục con (video được chia theo prompt)."""
+    n = 0
+    for thu, _, fs in os.walk(goc):
+        n += len([f for f in fs if f.endswith(".mp4")])
+    return n
+
+
 PORT = 8733
 DEM = {"tao": 0, "sua": 0}
 
@@ -243,10 +251,11 @@ def main():
     kiem("video: 2 dòng", len(gtv) == 2, str(len(gtv)))
     kiem("video: cả 2 OK", all(g[3] == "OK" for g in gtv), str(gtv))
     kiem("video: mock nhận 2 job", DEM.get("video") == 2, str(DEM))
-    mp4s = [f for f in os.listdir(out) if f.endswith(".mp4")]
+    mp4s = [os.path.join(t, f) for t, _, fs in os.walk(out)
+            for f in fs if f.endswith(".mp4")]
     kiem("video: 2 file mp4", len(mp4s) == 2, str(mp4s))
-    kiem("video: file đúng dung lượng", all(os.path.getsize(os.path.join(out, f)) == len(MP4)
-                                            for f in mp4s), str([os.path.getsize(os.path.join(out, f)) for f in mp4s]))
+    kiem("video: file đúng dung lượng", all(os.path.getsize(f) == len(MP4) for f in mp4s),
+         str([os.path.getsize(f) for f in mp4s]))
 
     # ---- tab video: có ảnh khung (I2V)
     f_png = [f for f in os.listdir(out) if f.endswith(".png")][0]
@@ -271,7 +280,7 @@ def main():
     gtv2 = [app.tree.item(i, "values") for i in app.tree.get_children()]
     kiem("video I2V: 1 dòng OK", len(gtv2) == 1 and gtv2[0][3] == "OK", str(gtv2))
     kiem("video I2V: thêm 1 job", DEM.get("video") == 3, str(DEM))
-    kiem("video I2V: 3 mp4", len([f for f in os.listdir(out) if f.endswith(".mp4")]) == 3,
+    kiem("video I2V: 3 mp4", dem_mp4(out) == 3,
          str(os.listdir(out)))
 
     # ---- MC: nối ngoại hình vào đầu prompt, random không lặp trong 1 vòng
@@ -311,6 +320,38 @@ def main():
     kiem("MC: 3 lần random không trùng nhau",
          len({p.split(",")[0] for p in gui}) == 3, str(gui))
 
+    # ---- Nhiều prompt: mỗi prompt 1 thư mục con đánh số tăng dần
+    app.cb_vnguon.set(T.api.DS_NGUON[0])
+    app._doi_nguon()
+    app.txt_prompt_video.delete("1.0", "end")
+    app.txt_prompt_video.insert("1.0", "FOLDER A" + chr(10) + "FOLDER B" + chr(10) + "FOLDER C" + chr(10))
+    app.txt_mc.delete("1.0", "end")
+    app.sp_vmoi.delete(0, "end")
+    app.sp_vmoi.insert(0, "1")
+    DEM["video"] = 0
+    app.cfg["api_key"] = "LV_ok"
+    app.nb.select(1)
+    app._bam_chay()
+    t0 = time.time()
+    while app.dang_chay and time.time() - t0 < 40:
+        app.update()
+        time.sleep(0.03)
+    for _ in range(30):
+        app.update()
+        time.sleep(0.02)
+    subs = sorted(d for d in os.listdir(out) if os.path.isdir(os.path.join(out, d))
+                  and d[:2].isdigit() and "folder_" in d)
+    kiem("nhiều prompt: 3 thư mục con", len(subs) == 3, str(subs))
+    kiem("nhiều prompt: đánh số 01..03", [d[:2] for d in subs] == ["01", "02", "03"], str(subs))
+    kiem("nhiều prompt: mỗi thư mục 1 mp4",
+         all(len([f for f in os.listdir(os.path.join(out, d)) if f.endswith(".mp4")]) == 1
+             for d in subs), str(subs))
+    kiem("nhiều prompt: tên thư mục theo prompt",
+         all(w in " ".join(subs).lower() for w in ("folder_a", "folder_b", "folder_c")), str(subs))
+    # chạy lại cùng prompt → dùng lại thư mục cũ, không tạo 04_
+    lai = T.App._tao_thu_muc_prompt(out, 1, "FOLDER A")
+    kiem("chạy lại: dùng lại thư mục cũ", os.path.basename(lai) == subs[0], os.path.basename(lai))
+
     # ---- Folder ảnh tham chiếu: mỗi ảnh 1 video, dùng xong xoá khỏi folder
     tc_dir = os.path.join(out, "_thamchieu")
     os.makedirs(tc_dir, exist_ok=True)
@@ -333,7 +374,7 @@ def main():
     app.txt_mc.delete("1.0", "end")
     DEM["video"] = 0
     app.cfg["api_key"] = "LV_ok"
-    n_mp4_truoc = len([f for f in os.listdir(out) if f.endswith(".mp4")])
+    n_mp4_truoc = dem_mp4(out)
     app.nb.select(1)
     app._bam_chay()
     t0 = time.time()
@@ -347,7 +388,7 @@ def main():
     kiem("tham chieu: 3 dòng OK", len(gt3) == 3 and all(g[3] == "OK" for g in gt3), str(gt3))
     kiem("tham chieu: 3 job", DEM.get("video") == 3, str(DEM.get("video")))
     kiem("tham chieu: thêm 3 mp4",
-         len([f for f in os.listdir(out) if f.endswith(".mp4")]) == n_mp4_truoc + 3,
+         dem_mp4(out) == n_mp4_truoc + 3,
          str(os.listdir(out)))
     con_lai = [f for f in os.listdir(tc_dir)]
     kiem("tham chieu: folder rỗng sau khi chạy", con_lai == [], str(con_lai))

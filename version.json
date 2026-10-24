@@ -1,5 +1,5 @@
 {
-  "version": "1.0.4",
-  "notes": "1.0.4: Tab video co them khung 'Folder anh tham chieu' - moi anh trong folder = 1 video, dung xong tu xoa khoi folder nen khong bao gio bi dung lai. Nut 'Xem' mo folder, o tich 'Xoa anh sau khi dung' (mac dinh BAT).",
+  "version": "1.0.5",
+  "notes": "1.0.5: Khi nhieu prompt, tool tu tao thu muc con danh so tang dan (01_<prompt>, 02_<prompt>...) va don tat ca video cua cung 1 prompt vao chung thu muc do. Chay lai cung prompt thi dung lai thu muc cu, khong tao thu muc moi.",
   "date": "2026-10-24"
 }
