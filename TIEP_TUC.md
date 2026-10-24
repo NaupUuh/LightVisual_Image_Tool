@@ -1,6 +1,6 @@
 # TIẾP TỤC — LightVisual Image Tool
 
-Cập nhật: 2026-10-24 · **v1.0.3** · trạng thái: chạy thật OK với key thật (gói Grok Vô Hạn 1 ngày)
+Cập nhật: 2026-10-24 · **v1.0.4** · trạng thái: chạy thật OK với key thật (gói Grok Vô Hạn 1 ngày)
 
 ## 1. Tool này làm gì
 Tạo ảnh hàng loạt qua API lightvisual.studio (`POST /v1/images/generations`),
@@ -16,7 +16,7 @@ Gói **Grok Vô Hạn** → ảnh Grok tính **0đ**, kể cả ảnh gửi kèm
 - `tiep_tuc.json` — trạng thái lượt chạy dở (tự sinh, đừng commit).
 - `output/` — thư mục ra mặc định.
 
-## 3. Tab video (v1.0.2)
+## 3. Tab video (v1.0.2 → v1.0.4)
 - 3 nguồn vào: **chỉ prompt (T2V)** / **ảnh khung (I2V)** / **prompt ảnh → ảnh → video**.
 - Bỏ hẳn "Số lượng" ở tab video — số luồng tự suy từ **số API key** (1 key = 1 luồng).
 - **Video mỗi prompt** (1–50): 1 prompt × N = N video.
@@ -33,9 +33,10 @@ Gói **Grok Vô Hạn** → ảnh Grok tính **0đ**, kể cả ảnh gửi kèm
 | Test | Kết quả |
 |---|---|
 | `tests/test_mock.py` | **19/0 PASS** |
-| `tests/test_gui.py` | **56/0 PASS** |
+| `tests/test_gui.py` | **63/0 PASS** |
 | `tests/test_key_dialog.py` | **7/0 PASS** |
 | `tests/_test_update_btn.py` | **PASS** (nút Cập nhật hiện, bấm chạy được) |
+| `tests/_do_tab_tc.py` | **PASS** (tab video không cắt khung tham chiếu ở 1040x640) |
 | `py_compile` main.py + core/api.py + updater.py | OK (3.13) |
 
 ### 4b. Test với key thật + gói `grok-unlimited-d1-s1`
@@ -56,6 +57,16 @@ Góc phải trên, cạnh nút `API key`. Máy nào cũng chỉ cần bấm 1 l�
 - Bản cũ sao lưu vào `_backup_update/<timestamp>/` (khôi phục bằng `updater.rollback()`).
 - Chạy tay: `python updater.py` (chỉ kiểm tra) · `python updater.py --apply` (cập nhật).
 - `cacert.pem` đóng gói kèm để máy thiếu chứng chỉ CA vẫn gọi HTTPS được.
+
+## 5b. Folder ảnh tham chiếu (v1.0.4)
+Nguồn thứ 4 trong "Nguồn cảnh đầu": **Folder ảnh tham chiếu → video**.
+- Chọn folder chứa ảnh; mỗi ảnh trong folder = **đúng 1 video** (không nhân `Video mỗi prompt`).
+- Ảnh dùng làm khung đầu (I2V) như nguồn "Ảnh khung", nhưng **dùng xong bị xoá khỏi folder** → lần sau không bao giờ lặp lại ảnh cũ.
+- Ô tích **"Xoá ảnh sau khi dùng"** mặc định BẬT; tắt đi thì ảnh giữ nguyên (dùng lại được).
+- Prompt video xoay vòng theo số ảnh; MC vẫn nối trước prompt như cũ.
+- Nhãn cạnh ô nhập hiện **"còn N ảnh"** và tự cập nhật sau mỗi ảnh xong.
+- Nếu ảnh bị xoá/mất giữa lúc chạy → job đó báo LỖI "Không thấy ảnh khung", các job khác chạy tiếp.
+- "Nạp lại" lượt cũ có ảnh tham chiếu đã xoá → báo rõ, không chạy lại được (đúng thiết kế).
 
 ## 6. Việc còn lại
 1. Gói hiện tại chỉ **1 ngày / 1 luồng** → muốn nhiều luồng song song thật thì nâng gói hoặc thêm nhiều key.

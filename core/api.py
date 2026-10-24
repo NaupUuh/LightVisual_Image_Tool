@@ -46,6 +46,7 @@ DS_NGUON = [
     "Chỉ prompt video (không cần ảnh khung)",
     "Ảnh khung → video (giữ nguyên cảnh đầu)",
     "Prompt ảnh → tạo ảnh → video",
+    "Folder ảnh tham chiếu → video (mỗi ảnh 1 video, dùng xong xoá)",
 ]
 GIA_VIDEO = {"480p": 40, "720p": 70, "1080p": 125}
 PHI_ANH_KHUNG = 15       # mỗi ảnh khung đầu cộng thêm, đồng

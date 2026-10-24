@@ -17,7 +17,7 @@ import traceback
 import webbrowser
 from tkinter import filedialog, messagebox, ttk
 
-APP_VERSION = "1.0.3"
+APP_VERSION = "1.0.4"
 APP_TEN = "LightVisual Image Tool"
 
 THU_MUC_GOC = os.path.dirname(os.path.abspath(__file__))
@@ -54,6 +54,8 @@ DEFAULTS = {
     "video_moi": 4,
     "video_luong": 2,
     "video_mc": "",
+    "video_tham_chieu": "",
+    "video_xoa_tham_chieu": True,
 }
 
 NEN = "#12141a"
@@ -613,9 +615,27 @@ class App(tk.Tk):
         s3.grid(row=0, column=1, sticky="ns")
         self.lst_khung.configure(yscrollcommand=s3.set)
 
+        # folder ảnh tham chiếu — mỗi ảnh dùng 1 lần rồi xoá
+        tc = ttk.Frame(f)
+        tc.grid(row=9, column=0, sticky="ew", pady=(8, 0))
+        ttk.Label(tc, text="Folder ảnh tham chiếu", style="TieuDe.TLabel").pack(side="left")
+        self.e_thamchieu = tk.Entry(tc, bg=NEN2, fg=CHU, insertbackground=CHU,
+                                    relief="flat", width=52)
+        self.e_thamchieu.pack(side="left", padx=(8, 0), ipady=3)
+        self.e_thamchieu.insert(0, self.cfg.get("video_tham_chieu") or "")
+        self.e_thamchieu.bind("<FocusOut>", lambda e: self._cap_nhat_dem_tham_chieu())
+        ttk.Button(tc, text="...", width=3, command=self._chon_tham_chieu).pack(side="left", padx=6)
+        ttk.Button(tc, text="Xem", width=5, command=self._xem_tham_chieu).pack(side="left")
+        self.var_xtc = tk.BooleanVar(value=bool(self.cfg.get("video_xoa_tham_chieu", True)))
+        ttk.Checkbutton(tc, text="Xoá ảnh sau khi dùng", variable=self.var_xtc,
+                        command=self._luu_tuy_chon_video).pack(side="left", padx=(10, 0))
+        self.lbl_tc = ttk.Label(tc, text="", style="Mo.TLabel")
+        self.lbl_tc.pack(side="left", padx=8)
+        self._cap_nhat_dem_tham_chieu()
+
         # panel tuỳ chọn video
         p = ttk.Frame(f, style="Panel.TFrame", padding=14)
-        p.grid(row=0, column=1, rowspan=9, sticky="nsew", padx=(14, 0))
+        p.grid(row=0, column=1, rowspan=10, sticky="nsew", padx=(14, 0))
         p.columnconfigure(1, weight=1)
 
         def nhan(r, t):
@@ -688,6 +708,55 @@ class App(tk.Tk):
 
     def _ds_anh_khung(self):
         return [self.lst_khung.get(i) for i in range(self.lst_khung.size())]
+
+    # ------------------------------------------------ folder ảnh tham chiếu
+    def _ds_tham_chieu(self):
+        """Ảnh còn trong folder tham chiếu (mỗi ảnh chỉ dùng 1 lần)."""
+        p = self.e_thamchieu.get().strip() if hasattr(self, "e_thamchieu") else ""
+        return api.ds_anh_trong_folder(p) if p else []
+
+    def _cap_nhat_dem_tham_chieu(self):
+        if not hasattr(self, "lbl_tc"):
+            return
+        p = self.e_thamchieu.get().strip()
+        if not p:
+            self.lbl_tc.configure(text="chưa chọn folder")
+        elif not os.path.isdir(p):
+            self.lbl_tc.configure(text="không thấy folder")
+        else:
+            n = len(api.ds_anh_trong_folder(p))
+            self.lbl_tc.configure(text="còn %d ảnh" % n)
+        self._cap_nhat_phi_video()
+
+    def _chon_tham_chieu(self):
+        p = filedialog.askdirectory(initialdir=self.e_thamchieu.get() or THU_MUC_GOC,
+                                    title="Chọn folder ảnh tham chiếu")
+        if not p:
+            return
+        self.e_thamchieu.delete(0, "end")
+        self.e_thamchieu.insert(0, p)
+        self._luu_tuy_chon_video()
+        self._cap_nhat_dem_tham_chieu()
+
+    def _xem_tham_chieu(self):
+        p = self.e_thamchieu.get().strip()
+        if not p or not os.path.isdir(p):
+            messagebox.showinfo(APP_TEN, "Chưa chọn folder ảnh tham chiếu.")
+            return
+        self._mo_thu_muc(p)
+
+    def _mo_thu_muc(self, p):
+        mo_folder(p)
+
+    def _xoa_anh_tham_chieu(self, p):
+        """Ảnh tham chiếu đã dùng xong → xoá khỏi folder để không bị dùng lại."""
+        try:
+            if os.path.isfile(p):
+                os.remove(p)
+                self.ui_q.put(("log", "Đã xoá ảnh tham chiếu: %s" % os.path.basename(p)))
+        except Exception as e:
+            self.ui_q.put(("log", "Không xoá được %s (%s)" % (os.path.basename(p), e)))
+        self.ui_q.put(("dem_tc", None))
 
     def _cap_nhat_dem_khung(self):
         self.lbl_khung.configure(text="%d ảnh" % self.lst_khung.size())
@@ -771,6 +840,9 @@ class App(tk.Tk):
         self.cfg["video_luong"] = len(self._ds_key()) or 1
         self.cfg["video_mc"] = self.txt_mc.get("1.0", "end").strip()
         self.cfg["video_mo_khi_xong"] = bool(self.var_vmo.get())
+        if hasattr(self, "e_thamchieu"):
+            self.cfg["video_tham_chieu"] = self.e_thamchieu.get().strip()
+            self.cfg["video_xoa_tham_chieu"] = bool(self.var_xtc.get())
         self.cfg.update({
             "video_model": self._model_video_dang_chon(),
             "video_res": self.cb_vres.get(),
@@ -786,6 +858,9 @@ class App(tk.Tk):
     def _dang_chon_prompt_anh(self):
         return self.cb_vnguon.get() == api.DS_NGUON[2]
 
+    def _dang_chon_tham_chieu(self):
+        return self.cb_vnguon.get() == api.DS_NGUON[3]
+
     def _doi_nguon(self):
         """Đổi nguồn cảnh đầu → bật/tắt ô nhập cho khớp.
 
@@ -798,6 +873,7 @@ class App(tk.Tk):
             self.txt_prompt_anh.configure(state="normal" if prompt_anh else "disabled",
                                           bg=NEN2 if prompt_anh else "#0d0f14")
             self.lst_khung.configure(bg=NEN2 if self._dang_chon_khung() else "#0d0f14")
+            self.e_thamchieu.configure(bg=NEN2 if self._dang_chon_tham_chieu() else "#0d0f14")
         except tk.TclError:
             pass
         self._cap_nhat_phi_video()
@@ -847,6 +923,11 @@ class App(tk.Tk):
             so_video = n_ia * moi
             mo_ta = "%d prompt ảnh × %d" % (n_ia, moi)
             co_khung = True          # có phí ảnh khung phải tạo
+        elif self._dang_chon_tham_chieu():
+            n_tc = len(self._ds_tham_chieu())
+            so_video = max(1, n_tc)
+            mo_ta = "%d ảnh tham chiếu × 1" % n_tc
+            co_khung = n_tc > 0
         else:
             so_video = max(1, so_prompt) * moi
             mo_ta = "%d prompt × %d" % (max(1, so_prompt), moi)
@@ -1151,6 +1232,8 @@ class App(tk.Tk):
                     self._ket_thuc(*gt)
                 elif loai == "kiem_key":
                     self._hien_kq_kiem_key(gt)
+                elif loai == "dem_tc":
+                    self._cap_nhat_dem_tham_chieu()
                 elif loai == "key_chet":
                     self._cap_nhat_key_label()
                     self._log("Đã loại 1 API key không dùng được.")
@@ -1295,6 +1378,7 @@ class App(tk.Tk):
         ds_pv = self._ds_prompt_video()
         ds_pa = self._ds_prompt_anh()
         ds_mc = self._ds_mc()
+        ds_tc = self._ds_tham_chieu() if self._dang_chon_tham_chieu() else []
 
         # kiểm tra đầu vào theo nguồn
         if nguon == api.DS_NGUON[1]:
@@ -1308,6 +1392,17 @@ class App(tk.Tk):
         elif nguon == api.DS_NGUON[2]:
             if not ds_pa:
                 messagebox.showwarning(APP_TEN, "Chưa có prompt ảnh.")
+                return
+            if not ds_pv:
+                messagebox.showwarning(APP_TEN, "Chưa có prompt video.")
+                return
+        elif nguon == api.DS_NGUON[3]:
+            if not self.e_thamchieu.get().strip():
+                messagebox.showwarning(APP_TEN, "Chưa chọn folder ảnh tham chiếu.")
+                return
+            if not ds_tc:
+                messagebox.showinfo(APP_TEN, "Folder ảnh tham chiếu đã hết ảnh.\n"
+                                             "Chọn folder khác hoặc thêm ảnh vào folder.")
                 return
             if not ds_pv:
                 messagebox.showwarning(APP_TEN, "Chưa có prompt video.")
@@ -1354,6 +1449,15 @@ class App(tk.Tk):
                     viec.append({"stt": stt, "prompt": ds_pv[(stt - 1) % len(ds_pv)],
                                  "khung": "", "prompt_anh": p_a,
                                  "lan": j + 1, "moi": moi, "nhan": p_a[:40]})
+        elif nguon == api.DS_NGUON[3]:
+            # mỗi ảnh tham chiếu → đúng 1 video; ảnh dùng xong bị xoá khỏi folder
+            for p_anh in ds_tc:
+                stt += 1
+                viec.append({"stt": stt, "prompt": ds_pv[(stt - 1) % len(ds_pv)],
+                             "khung": p_anh, "prompt_anh": "",
+                             "lan": 1, "moi": 1,
+                             "nhan": os.path.basename(p_anh),
+                             "xoa_sau": bool(self.var_xtc.get())})
         else:
             for p in ds_pv:
                 for j in range(moi):
@@ -1427,6 +1531,8 @@ class App(tk.Tk):
     def _tao_video_bang_key(self, key, v, ch):
         """Tạo + chờ + tải 1 video. Trả (đường dẫn, số byte)."""
         khung = v.get("khung") or ""
+        if khung and not os.path.isfile(khung):
+            raise api.LoiAPI("Không thấy ảnh khung: %s" % os.path.basename(khung), 0, "bad_input")
         if v.get("prompt_anh"):
             # bước 1: tạo ảnh khung từ prompt ảnh
             kq = api.tao_anh(key, self.cfg.get("model") or DEFAULTS["model"],
@@ -1483,6 +1589,8 @@ class App(tk.Tk):
             self.ui_q.put(("log", "[%d] OK  %s  (%.1fs, %.1f MB)" %
                            (v["stt"], os.path.basename(duong_dan), giay,
                             n / (1024.0 * 1024))))
+            if v.get("xoa_sau") and v.get("khung"):
+                self._xoa_anh_tham_chieu(v["khung"])
         except api.LoiAPI as e:
             if the_he is not None and the_he != self._the_he:
                 return key
@@ -1790,6 +1898,14 @@ class App(tk.Tk):
             self._doc_tt()
         if not self._lan_chay:
             messagebox.showinfo(APP_TEN, "Không có lượt chạy nào để nạp lại.")
+            return
+        thieu = [v for v in self._lan_chay["viec"]
+                 if v.get("khung") and not os.path.isfile(v["khung"])]
+        if thieu:
+            messagebox.showinfo(
+                APP_TEN, "Lượt trước dùng folder ảnh tham chiếu — %d ảnh đã bị xoá "
+                         "sau khi dùng nên không nạp lại được.\n"
+                         "Hãy thêm ảnh mới vào folder rồi bấm CHẠY." % len(thieu))
             return
         self.nb.select(2 if self._lan_chay["loai"] == "anh" else 3)
         self._chay_luot(self._lan_chay["loai"], self._lan_chay["viec"],

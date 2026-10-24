@@ -1,5 +1,5 @@
 {
-  "version": "1.0.3",
-  "notes": "1.0.3: Them nut 'Cap nhat' o goc phai tren - may khac chi can bam la tu tai ban moi tu GitHub va khoi dong lai (giu nguyen config.json + API key + anh/video cu). Mac dinh TAT 'Mo folder khi chay xong'.",
+  "version": "1.0.4",
+  "notes": "1.0.4: Tab video co them khung 'Folder anh tham chieu' - moi anh trong folder = 1 video, dung xong tu xoa khoi folder nen khong bao gio bi dung lai. Nut 'Xem' mo folder, o tich 'Xoa anh sau khi dung' (mac dinh BAT).",
   "date": "2026-10-24"
 }

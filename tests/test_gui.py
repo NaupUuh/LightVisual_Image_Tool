@@ -311,6 +311,49 @@ def main():
     kiem("MC: 3 lần random không trùng nhau",
          len({p.split(",")[0] for p in gui}) == 3, str(gui))
 
+    # ---- Folder ảnh tham chiếu: mỗi ảnh 1 video, dùng xong xoá khỏi folder
+    tc_dir = os.path.join(out, "_thamchieu")
+    os.makedirs(tc_dir, exist_ok=True)
+    for k in range(3):
+        with open(os.path.join(tc_dir, "ref%d.png" % k), "wb") as fh:
+            fh.write(ANH)
+    app.cb_vnguon.set(T.api.DS_NGUON[3])
+    app.e_thamchieu.delete(0, "end")
+    app.e_thamchieu.insert(0, tc_dir)
+    app._doi_nguon()
+    app._cap_nhat_dem_tham_chieu()
+    kiem("tham chieu: đếm đúng 3 ảnh", "còn 3 ảnh" in app.lbl_tc.cget("text"),
+         app.lbl_tc.cget("text"))
+    kiem("tham chieu: ước tính 3 video",
+         "3 ảnh tham chiếu" in app.lbl_phi_video.cget("text"),
+         app.lbl_phi_video.cget("text"))
+    app.var_xtc.set(True)
+    app.txt_prompt_video.delete("1.0", "end")
+    app.txt_prompt_video.insert("1.0", "REF PROMPT" + chr(10))
+    app.txt_mc.delete("1.0", "end")
+    DEM["video"] = 0
+    app.cfg["api_key"] = "LV_ok"
+    n_mp4_truoc = len([f for f in os.listdir(out) if f.endswith(".mp4")])
+    app.nb.select(1)
+    app._bam_chay()
+    t0 = time.time()
+    while app.dang_chay and time.time() - t0 < 40:
+        app.update()
+        time.sleep(0.03)
+    for _ in range(30):
+        app.update()
+        time.sleep(0.02)
+    gt3 = [app.tree.item(i, "values") for i in app.tree.get_children()]
+    kiem("tham chieu: 3 dòng OK", len(gt3) == 3 and all(g[3] == "OK" for g in gt3), str(gt3))
+    kiem("tham chieu: 3 job", DEM.get("video") == 3, str(DEM.get("video")))
+    kiem("tham chieu: thêm 3 mp4",
+         len([f for f in os.listdir(out) if f.endswith(".mp4")]) == n_mp4_truoc + 3,
+         str(os.listdir(out)))
+    con_lai = [f for f in os.listdir(tc_dir)]
+    kiem("tham chieu: folder rỗng sau khi chạy", con_lai == [], str(con_lai))
+    kiem("tham chieu: nhãn về 0 ảnh", "còn 0 ảnh" in app.lbl_tc.cget("text"),
+         app.lbl_tc.cget("text"))
+
     # ---- Dừng → Tiếp tục: không làm lại việc đã OK, không mất việc
     app.cb_vnguon.set(T.api.DS_NGUON[0])
     app._doi_nguon()
