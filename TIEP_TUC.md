@@ -1,6 +1,6 @@
 # TIẾP TỤC — LightVisual Image Tool
 
-Cập nhật: 2026-10-24 · **v1.0.2** · trạng thái: chạy thật OK với key thật (gói Grok Vô Hạn 1 ngày)
+Cập nhật: 2026-10-24 · **v1.0.3** · trạng thái: chạy thật OK với key thật (gói Grok Vô Hạn 1 ngày)
 
 ## 1. Tool này làm gì
 Tạo ảnh hàng loạt qua API lightvisual.studio (`POST /v1/images/generations`),
@@ -35,7 +35,8 @@ Gói **Grok Vô Hạn** → ảnh Grok tính **0đ**, kể cả ảnh gửi kèm
 | `tests/test_mock.py` | **19/0 PASS** |
 | `tests/test_gui.py` | **56/0 PASS** |
 | `tests/test_key_dialog.py` | **7/0 PASS** |
-| `py_compile` main.py + core/api.py | OK (3.13 và 3.9.9) |
+| `tests/_test_update_btn.py` | **PASS** (nút Cập nhật hiện, bấm chạy được) |
+| `py_compile` main.py + core/api.py + updater.py | OK (3.13) |
 
 ### 4b. Test với key thật + gói `grok-unlimited-d1-s1`
 | Việc | Kết quả đo được |
@@ -46,13 +47,23 @@ Gói **Grok Vô Hạn** → ảnh Grok tính **0đ**, kể cả ảnh gửi kèm
 | Tạo video T2V (1 s / 480p) | job `lv_job_75b5a33…`, xong ~**22 s**, MP4 285 KB, `mvhd dur 1042 → 1.04 s`, `avc1 @24` |
 | Xoay key (1 key hỏng 401 + 1 key thật) | tự loại key hỏng, chuyển key sống, không dừng lô |
 
-## 5. Việc còn lại
+## 5. Nút "⬆ Cập nhật" (v1.0.3)
+Góc phải trên, cạnh nút `API key`. Máy nào cũng chỉ cần bấm 1 lần:
+1. Kiểm tra `version.json` trên GitHub (qua API, không bị CDN cache) → so với `APP_VERSION`.
+2. Có bản mới → hỏi, rồi tải zip nhánh `master` và ghi đè mã nguồn.
+3. Tự khởi động lại tool.
+- **Giữ nguyên**: `config.json` (API key + cài đặt), `tiep_tuc.json`, `output/`.
+- Bản cũ sao lưu vào `_backup_update/<timestamp>/` (khôi phục bằng `updater.rollback()`).
+- Chạy tay: `python updater.py` (chỉ kiểm tra) · `python updater.py --apply` (cập nhật).
+- `cacert.pem` đóng gói kèm để máy thiếu chứng chỉ CA vẫn gọi HTTPS được.
+
+## 6. Việc còn lại
 1. Gói hiện tại chỉ **1 ngày / 1 luồng** → muốn nhiều luồng song song thật thì nâng gói hoặc thêm nhiều key.
 2. Bắn 2 job video liên tiếp trên gói 1 luồng dễ gặp `"Model đang bị giới hạn tốc độ"` — chờ vài giây rồi chạy lại.
 3. Gói hết hạn thì `/v1/balance` vẫn trả 200 nhưng sẽ bị trừ credit — kiểm tra số dư định kỳ.
 4. Chưa test video 15 s / 1080p thật (tốn credit); preset đã set sẵn 15 s / 1080p / 9:16 / 4 video mỗi prompt.
 
-## 6. Lệnh hay dùng
+## 7. Lệnh hay dùng
 ```
 cd C:\Users\Admin\Desktop\LightVisual_Image_Tool
 run.bat                       :: chạy ẩn
@@ -62,6 +73,6 @@ python tests\test_gui.py      :: test GUI + chạy thử
 python tests\test_key_dialog.py
 ```
 
-## 7. Bản sao lưu
+## 8. Bản sao lưu
 - `Z:\HQData-2\TOOLS TỔNG HỢP\TOOLS UPDATE CUỐI\LightVisual_Image_Tool\` — bản sync, **không kèm key**.
 - GitHub: `https://github.com/NaupUuh/LightVisual_Image_Tool` — `config.json` + `tiep_tuc.json` + `output/` nằm trong `.gitignore`.
