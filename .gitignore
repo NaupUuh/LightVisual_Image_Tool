@@ -1,0 +1,7 @@
+config.json
+tiep_tuc.json
+output/
+tests/_tmp_test/
+tests/_tmp_do/
+__pycache__/
+*.pyc

@@ -1,0 +1,5 @@
+{
+  "version": "1.0.2",
+  "notes": "1.0.2: Tab video bo 'So luong' (so luong khong con bi nham la so luong), doi thanh 'Video moi prompt' 1-50. Them khung ngoai hinh MC: random noi vao TRUOC prompt video, moi video mot MC khac nhau. Dung/Tiep tuc: moi luot dung queue rieng nen luong cu khong gianh viec cua luot moi; viec bi cat giua chung duoc chay lai. Mac dinh TAT 'Mo folder khi chay xong'.",
+  "date": "2026-10-24"
+}

@@ -1,0 +1,92 @@
+# LightVisual Image Tool — v1.0.0
+
+Tool Tkinter tạo ảnh hàng loạt qua API **lightvisual.studio** (không qua web, không cần mở trình duyệt).
+Chạy được trên **Python 3.9+**, không cần `pip install` gì (core dùng `urllib`).
+
+---
+
+## 1. Chạy
+
+- Nhấp đôi **`run.bat`** (chạy ẩn, không hiện cửa sổ cmd).
+- Muốn xem log lỗi khi khởi động: `run.bat debug`.
+- Lần đầu mở: bấm nút **`API key`** ở góc phải trên → dán key → **Lưu**.
+
+## 2. Lấy API key
+
+1. Đăng nhập https://lightvisual.studio
+2. Kích hoạt **Gói Grok Vô Hạn** (từ 43.000đ) → ảnh Grok tính **0đ**.
+3. Vào https://lightvisual.studio/docs/api/images hoặc trang tài khoản → tạo API key.
+4. Dán vào hộp thoại `API key` của tool.
+
+## 3. Nhiều API key — chạy nhiều luồng
+
+Nút **`API key`** mở hộp thoại nhiều dòng:
+
+```
+key_thu_nhat
+key_thu_hai
+# dòng bắt đầu bằng # sẽ bỏ qua
+```
+
+- **Mỗi dòng = 1 key.** Tool chia đều việc cho các luồng, mỗi lần gọi lấy key kế tiếp (vòng tròn).
+- **Kiểm tra tất cả**: gọi `/v1/balance` cho từng key, hiện `OK (tên gói)` hoặc `LỖI (...)`.
+- Key chết (401/402/403 — sai key, hết hạn, hết credit) **tự bị loại khỏi danh sách** và việc đó được chuyển sang key còn sống. Không dừng cả lô.
+- Key lưu trong `config.json` cùng thư mục tool — **đừng đưa file này lên mạng**.
+
+## 4. Tab 1 — Tạo ảnh hàng loạt
+
+| Mục | Ý nghĩa |
+|---|---|
+| Ô prompt lớn | **Mỗi dòng = 1 prompt**. Dòng bắt đầu `#` bị bỏ qua. Dán cả nghìn dòng được. |
+| Model | Grok 2.0 (30đ/ảnh) · Grok Imagine (10đ/ảnh) · Nano Banana Pro (50đ/ảnh) |
+| Tỉ lệ | Grok: 8 tỉ lệ (1:1, 16:9, 9:16, 4:3, 3:4, 3:2, 2:3, auto) · Nano: 16:9 / 9:16 / 1:1 |
+| Độ phân giải | `1k` / `2k` (chỉ Grok) |
+| Chất lượng | `low` / `medium` / `auto` (chỉ Grok 2.0) |
+| Ảnh mỗi prompt | 1–4 (mỗi ảnh là 1 lần gọi riêng) |
+| Số luồng | 1–8 luồng chạy song song |
+| Thư mục ra | Mặc định `output\` trong thư mục tool |
+
+Dòng ước tính chi phí cập nhật ngay khi gõ prompt. **Gói Grok Vô Hạn → 0đ.**
+
+Tên file ra: `001_<prompt-rut-gon>_1.png` — số thứ tự tăng dần, không ghi đè.
+
+## 5. Tab 2 — Sửa ảnh / giữ nhân vật
+
+- Thêm 1–5 ảnh gửi kèm (Grok tối đa **5 ảnh**, Nano Banana tối đa **3 ảnh**).
+- Trong prompt dùng tag `<IMAGE_0>`, `<IMAGE_1>`… để chỉ ảnh nào.
+- Dùng để **giữ nguyên gương mặt nhân vật**, chỉ đổi bối cảnh / trang phục / ánh sáng.
+- Ảnh gửi kèm **không bị tính thêm phí** khi dùng gói vô hạn.
+
+Ví dụ prompt:
+```
+<IMAGE_0> đứng trước toà nhà Quốc hội, áo vest xanh, ánh sáng ban ngày, máy quay ngang tầm mắt
+```
+
+## 6. Tab 3 — Kết quả & nhật ký
+
+- Bảng: STT · prompt · model · trạng thái · tên file · số giây.
+- Log chi tiết từng request, kể cả khi đổi key.
+- Nút **Dừng**: ngừng nhận việc mới, các luồng đang chạy kết thúc rồi mới dừng hẳn.
+
+## 7. Lỗi thường gặp
+
+| Hiện tượng | Nguyên nhân / cách xử lý |
+|---|---|
+| `401` / `403` | Key sai hoặc hết hạn → bấm `API key` → `Kiểm tra tất cả`. |
+| `429` | Bị giới hạn tốc độ → tool tự chờ theo `Retry-After` rồi thử lại. |
+| `File tải về không phải ảnh` | Server trả JSON lỗi thay vì ảnh → xem dòng log cùng STT. |
+| Ảnh sửa bị từ chối | Gửi quá số ảnh cho phép (Grok 5 / Nano 3) → bớt ảnh. |
+| Không thấy cửa sổ | Chạy `run.bat debug` để xem lỗi. |
+
+## 8. File trong thư mục
+
+```
+LightVisual_Image_Tool\
+├─ run.bat              ← nhấp đôi để chạy
+├─ main.py              ← GUI
+├─ core\api.py          ← client API (thuần stdlib)
+├─ config.json          ← tự sinh: key, tuỳ chọn (ĐỪNG chia sẻ)
+├─ version.json
+├─ output\              ← ảnh ra mặc định
+└─ tests\               ← test bằng máy chủ giả, không tốn credit
+```
