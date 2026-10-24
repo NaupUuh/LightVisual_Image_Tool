@@ -17,7 +17,7 @@ import traceback
 import webbrowser
 from tkinter import filedialog, messagebox, ttk
 
-APP_VERSION = "1.0.2"
+APP_VERSION = "1.0.3"
 APP_TEN = "LightVisual Image Tool"
 
 THU_MUC_GOC = os.path.dirname(os.path.abspath(__file__))
@@ -204,6 +204,8 @@ class App(tk.Tk):
         self.lbl_plan = ttk.Label(top, text="", style="Mo.TLabel")
         self.lbl_plan.pack(side="right")
         ttk.Button(top, text="API key", command=self._doi_key).pack(side="right", padx=(0, 10))
+        self.upd_btn = ttk.Button(top, text="⬆ Cập nhật", command=self._check_update)
+        self.upd_btn.pack(side="right", padx=(0, 8))
         ttk.Button(top, text="Tài liệu API", command=lambda: webbrowser.open(
             "https://lightvisual.studio/docs/api/images")).pack(side="right", padx=(0, 8))
 
@@ -1152,6 +1154,14 @@ class App(tk.Tk):
                 elif loai == "key_chet":
                     self._cap_nhat_key_label()
                     self._log("Đã loại 1 API key không dùng được.")
+                elif loai == "upd_hoi":
+                    self._update_hoi(gt)
+                elif loai == "upd_xong":
+                    self._update_xong(gt)
+                elif loai == "upd_xong_restart":
+                    self._update_xong_restart(gt)
+                elif loai == "upd_loi":
+                    self._update_loi(gt)
         except queue.Empty:
             pass
         except Exception:
@@ -1814,6 +1824,99 @@ class App(tk.Tk):
         self._luu_tt()
         self._cap_nhat_nut_tiep()
         self._cap_nhat_plan_label()
+
+    # ------------------------------------------------ cập nhật từ GitHub
+
+    def _check_update(self):
+        """Kiểm tra GitHub rồi (nếu có bản mới) hỏi trước khi cập nhật."""
+        if self.dang_chay:
+            messagebox.showwarning("Đang chạy",
+                                   "Tool đang chạy — đợi xong rồi cập nhật.")
+            return
+        self.upd_btn.configure(state="disabled", text="⬆ Đang kiểm tra...")
+        threading.Thread(target=self._update_work, daemon=True).start()
+
+    def _update_work(self):
+        try:
+            import updater as U
+        except Exception as e:
+            self.ui_q.put(("upd_loi", "Thiếu updater.py: %s" % e))
+            return
+        self.ui_q.put(("log", "Bản đang dùng: v%s" % U.read_local_version()))
+        r = U.check_update()
+        if not r.get("ok"):
+            self.ui_q.put(("upd_loi", r.get("error", "?")))
+            return
+        if not r.get("has_update"):
+            self.ui_q.put(("upd_xong",
+                           "Bạn đang dùng bản mới nhất (v%s)." % r["local"]))
+            return
+        self.ui_q.put(("upd_hoi", r))
+
+    def _update_hoi(self, r):
+        notes = (r.get("notes") or "").strip()
+        msg = ("Có bản mới v%s (bạn đang dùng v%s).\n\n" % (r["remote"], r["local"])
+               + (notes + "\n\n" if notes else "")
+               + "Cập nhật NGAY bây giờ?\n"
+                 "(Cài đặt + API key + ảnh/video cũ được giữ nguyên.)")
+        if not messagebox.askyesno("Có bản cập nhật", msg):
+            self._update_xong("Đã bỏ qua cập nhật.")
+            return
+        self.upd_btn.configure(text="⬆ Đang tải...")
+        threading.Thread(target=self._update_apply, args=(r,), daemon=True).start()
+
+    def _update_apply(self, r):
+        try:
+            import updater as U
+            res = U.apply_update(r.get("zip", ""),
+                                 log=lambda s: self.ui_q.put(("log", s)))
+        except Exception as e:
+            self.ui_q.put(("upd_loi", "Lỗi cập nhật: %s" % e))
+            return
+        if not res.get("ok"):
+            self.ui_q.put(("upd_loi", res.get("error", "?")))
+            return
+        self.ui_q.put(("upd_xong_restart", res))
+
+    def _update_xong_restart(self, res):
+        v = res.get("version", "?")
+        self._log("Đã cập nhật lên v%s. Đang khởi động lại tool..." % v)
+        if not messagebox.askyesno(
+                "Đã cập nhật",
+                "Đã cập nhật lên v%s.\n\n"
+                "Bản cũ được sao lưu ở:\n%s\n\n"
+                "Khởi động lại tool ngay bây giờ?" % (v, res.get("backup", ""))):
+            self._update_xong("Đã cập nhật v%s — mở lại tool để dùng bản mới." % v)
+            return
+        self._khoi_dong_lai()
+
+    def _khoi_dong_lai(self):
+        """Mở lại chính tool này rồi thoát tiến trình hiện tại."""
+        try:
+            import subprocess
+            py = sys.executable or "python"
+            me = os.path.join(THU_MUC_GOC, "main.py")
+            subprocess.Popen([py, me], cwd=THU_MUC_GOC)
+            self.after(300, self.destroy)
+        except Exception as e:
+            self._update_xong("Đã cập nhật — không tự mở lại được (%s). "
+                              "Mở tool bằng tay." % e)
+
+    def _update_xong(self, msg):
+        try:
+            self.upd_btn.configure(state="normal", text="⬆ Cập nhật")
+        except Exception:
+            pass
+        self._log(msg)
+
+    def _update_loi(self, err):
+        self._update_xong("LỖI cập nhật: %s" % err)
+        msg = "Không cập nhật được:\n%s" % err
+        low = str(err).lower()
+        if "certificate" in low or "ssl" in low:
+            msg += ("\n\nMáy này thiếu kho chứng chỉ CA.\n"
+                    "Cách sửa: chép file cacert.pem vào thư mục tool rồi thử lại.")
+        messagebox.showerror("Cập nhật", msg)
 
     def _thoat_app(self):
         if self.dang_chay:
