@@ -375,6 +375,41 @@ def main():
          all(re.search(r"_[0-9a-f]{6}$", os.path.basename(f)) for f in (f_a, f_b)),
          "%s | %s" % (os.path.basename(f_a), os.path.basename(f_b)))
 
+    # ---- Nhiều prompt + nhiều MC: mỗi prompt 1 thư mục (MC khác nhau không làm tách thư mục)
+    m_dir = os.path.join(out, "_mc_nhieu")
+    os.makedirs(m_dir, exist_ok=True)
+    app.cb_vnguon.set(T.api.DS_NGUON[0])
+    app._doi_nguon()
+    app.e_vra.delete(0, "end")
+    app.e_vra.insert(0, m_dir)
+    app.txt_prompt_video.delete("1.0", "end")
+    app.txt_prompt_video.insert("1.0", "PROMPT ONE" + chr(10) + "PROMPT TWO" + chr(10))
+    app.txt_mc.delete("1.0", "end")
+    app.txt_mc.insert("1.0", "MC_A" + chr(10) + "MC_B" + chr(10) + "MC_C" + chr(10))
+    app.sp_vmoi.delete(0, "end")
+    app.sp_vmoi.insert(0, "2")
+    DEM["video"] = 0
+    app.cfg["api_key"] = "LV_ok"
+    app.nb.select(1)
+    app._bam_chay()
+    t0 = time.time()
+    while app.dang_chay and time.time() - t0 < 60:
+        app.update()
+        time.sleep(0.03)
+    for _ in range(30):
+        app.update()
+        time.sleep(0.02)
+    subs_m = sorted(d for d in os.listdir(m_dir) if os.path.isdir(os.path.join(m_dir, d)))
+    kiem("MC + nhiều prompt: đúng 2 thư mục (không tách theo MC)",
+         len(subs_m) == 2, str(subs_m))
+    mp4_m = {d: len([f for f in os.listdir(os.path.join(m_dir, d)) if f.endswith(".mp4")])
+             for d in subs_m}
+    kiem("MC + nhiều prompt: mỗi thư mục 2 mp4 (2 video/prompt)",
+         sorted(mp4_m.values()) == [2, 2], str(mp4_m))
+    ten_m = " ".join(subs_m).lower()
+    kiem("MC + nhiều prompt: thư mục khớp prompt (one/two)",
+         "prompt_one" in ten_m and "prompt_two" in ten_m, str(subs_m))
+
     # ---- Folder ảnh tham chiếu: mỗi ảnh 1 video, dùng xong xoá khỏi folder
     tc_dir = os.path.join(out, "_thamchieu")
     os.makedirs(tc_dir, exist_ok=True)
