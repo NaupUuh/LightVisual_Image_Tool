@@ -1,6 +1,6 @@
 # TIẾP TỤC — LightVisual Image Tool
 
-Cập nhật: 2026-10-24 · **v1.0.5** · trạng thái: chạy thật OK với key thật (gói Grok Vô Hạn 1 ngày)
+Cập nhật: 2026-10-25 · **v1.0.6** · trạng thái: chạy thật OK với key thật (gói Grok Vô Hạn 1 ngày)
 
 ## 1. Tool này làm gì
 Tạo ảnh hàng loạt qua API lightvisual.studio (`POST /v1/images/generations`),
@@ -68,21 +68,42 @@ Nguồn thứ 4 trong "Nguồn cảnh đầu": **Folder ảnh tham chiếu → v
 - Nếu ảnh bị xoá/mất giữa lúc chạy → job đó báo LỖI "Không thấy ảnh khung", các job khác chạy tiếp.
 - "Nạp lại" lượt cũ có ảnh tham chiếu đã xoá → báo rõ, không chạy lại được (đúng thiết kế).
 
-## 5c. Thư mục con theo prompt (v1.0.5)
+## 5c. Thư mục con theo prompt (v1.0.5 → sửa lỗi ở v1.0.6)
 Khi tab video có **nhiều hơn 1 prompt** (sau khi đã nối MC), tool tự tạo thư mục con
 trong thư mục ra và dồn video của từng prompt vào đó:
 ```
-output/01_<prompt dau tien>/001_...mp4
-output/02_<prompt thu hai>/...
+output/01_<tu dau cua prompt>_<hash6>/001_...mp4
+output/02_<tu dau cua prompt>_<hash6>/...
 ```
-- Đánh số tăng dần, không nhảy số; tên = `ten_an_toan(prompt, 40)`.
-- **Chạy lại cùng prompt** → dùng lại đúng thư mục cũ (so khớp phần tên sau số), video mới
-  dồn vào cùng chỗ, không sinh `04_...`.
-- Prompt trùng tên rút gọn nhưng khác nội dung → tự nhảy số để không ghi lẫn.
+- Tên thư mục = `_ten_thu_muc(prompt)`:
+  - phần chữ: các **từ đầu** của `ten_an_toan(prompt, 400)`, cắt theo ranh giới từ, tối đa 48 ký tự;
+  - phần đuôi: **6 ký tự sha1 của prompt ĐẦY ĐỦ** → 2 prompt khác nhau **luôn** ra 2 thư mục khác nhau.
+- **Chạy lại cùng prompt** → dùng lại đúng thư mục cũ (so khớp hash 6 ký tự ở đuôi tên).
+- Số thư mục = số **kế tiếp** của dãy hiện có (không trùng số kể cả khi chèn prompt mới vào giữa).
 - **Chỉ 1 prompt thì giữ nguyên như cũ** — video nằm thẳng trong thư mục ra, không tạo
   thư mục con.
 - Ảnh khung tạo từ prompt ảnh (`_khung/`) cũng nằm trong thư mục của prompt đó.
 - Danh sách thư mục được in ra log ngay khi bắt đầu chạy.
+
+### Lỗi đã sửa ở v1.0.6 (2026-10-25)
+**Triệu chứng**: nhiều prompt khác nhau nhưng video bị dồn chung 1 thư mục con
+(vd `01_photorealistic_vertical_breaking_news_br/` chứa cả prompt "story one" lẫn "story two").
+
+**Nguyên nhân**: `_tao_thu_muc_prompt()` gọi `ten_an_toan(prompt, 40)` → tên thư mục chỉ còn
+40 ký tự đầu. Các prompt tin tức dùng chung phần mở ("photorealistic vertical breaking news
+broadcast studio…") nên 40 ký tự đầu giống nhau → bị coi là cùng 1 prompt, gộp chung thư mục.
+Test cũ chỉ đếm **tổng số MP4** nên không bắt được.
+
+**Cách sửa**: thêm `_ten_thu_muc()` cắt theo **từ** + gắn hash 6 ký tự của prompt đầy đủ;
+`_tao_thu_muc_prompt()` so khớp theo hash và cấp số kế tiếp của dãy.
+
+**Cách kiểm tra**: `python tests/test_gui.py` → 71 PASS / 0 FAIL, trong đó 3 test mới:
+`40 ký tự giống nhau: 2 prompt ra 2 thư mục`, `... chạy lại đúng prompt cũ → đúng thư mục cũ`,
+`... tên thư mục có mã băm phân biệt`.
+
+**Điều tránh**: đừng cắt tên thư mục theo **số ký tự** của prompt; luôn có thành phần phân biệt
+lấy từ toàn bộ nội dung (hash). Đừng assert test bằng tổng số file — phải assert **file nào nằm
+trong thư mục nào**.
 
 ## 6. Việc còn lại
 1. Gói hiện tại chỉ **1 ngày / 1 luồng** → muốn nhiều luồng song song thật thì nâng gói hoặc thêm nhiều key.

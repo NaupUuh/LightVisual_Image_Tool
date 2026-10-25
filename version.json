@@ -1,5 +1,5 @@
 {
-  "version": "1.0.5",
-  "notes": "1.0.5: Khi nhieu prompt, tool tu tao thu muc con danh so tang dan (01_<prompt>, 02_<prompt>...) va don tat ca video cua cung 1 prompt vao chung thu muc do. Chay lai cung prompt thi dung lai thu muc cu, khong tao thu muc moi.",
-  "date": "2026-10-24"
+  "version": "1.0.6",
+  "notes": "1.0.6: Sua loi thu muc con theo prompt bi gop sai. Truoc day ten thu muc bi cat con 40 ky tu nen nhieu prompt khac nhau nhung giong 40 ky tu dau (vd cung mo 'photorealistic vertical breaking news...') bi coi la 1 prompt va don chung 1 thu muc. Nay ten thu muc = <tu dau cua prompt>_<ma bam 6 ky tu cua prompt day du>, nen moi prompt khac nhau luon ra thu muc rieng; chay lai dung prompt cu van dung lai thu muc cu. So thu muc tang dan va khong trung so ke ca khi chen prompt moi vao giua danh sach.",
+  "date": "2026-10-25"
 }

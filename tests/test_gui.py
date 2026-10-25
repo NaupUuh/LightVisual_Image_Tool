@@ -7,6 +7,7 @@ qua mock -> bảng có 3 dòng OK, file tải về đúng, log có KẾT THÚC.
 
 import json
 import os
+import re
 import shutil
 import sys
 import threading
@@ -342,15 +343,37 @@ def main():
     subs = sorted(d for d in os.listdir(out) if os.path.isdir(os.path.join(out, d))
                   and d[:2].isdigit() and "folder_" in d)
     kiem("nhiều prompt: 3 thư mục con", len(subs) == 3, str(subs))
-    kiem("nhiều prompt: đánh số 01..03", [d[:2] for d in subs] == ["01", "02", "03"], str(subs))
+    so_thu_muc = [int(d.split("_", 1)[0]) for d in subs]
+    kiem("nhiều prompt: đánh số tăng dần, không trùng số",
+         so_thu_muc == sorted(set(so_thu_muc)) and len(so_thu_muc) == 3, str(subs))
     kiem("nhiều prompt: mỗi thư mục 1 mp4",
          all(len([f for f in os.listdir(os.path.join(out, d)) if f.endswith(".mp4")]) == 1
              for d in subs), str(subs))
     kiem("nhiều prompt: tên thư mục theo prompt",
          all(w in " ".join(subs).lower() for w in ("folder_a", "folder_b", "folder_c")), str(subs))
-    # chạy lại cùng prompt → dùng lại thư mục cũ, không tạo 04_
+    # chạy lại cùng prompt → dùng lại thư mục cũ, không tạo thêm
     lai = T.App._tao_thu_muc_prompt(out, 1, "FOLDER A")
     kiem("chạy lại: dùng lại thư mục cũ", os.path.basename(lai) == subs[0], os.path.basename(lai))
+
+    # ---- Bug 2026-10-25: prompt khác nhau nhưng 40 ký tự đầu giống nhau
+    #      → trước đây bị cắt tên còn 40 ký tự nên gộp chung 1 thư mục
+    b_dir = os.path.join(out, "_bug40")
+    os.makedirs(b_dir, exist_ok=True)
+    dau = "photorealistic vertical breaking news broadcast studio anchor desk red banner "
+    p_a = dau + "story about the senate vote"
+    p_b = dau + "story about the hurricane relief fund"
+    f_a = T.App._tao_thu_muc_prompt(b_dir, 1, p_a)
+    f_b = T.App._tao_thu_muc_prompt(b_dir, 2, p_b)
+    kiem("40 ký tự giống nhau: 2 prompt ra 2 thư mục", f_a != f_b,
+         "%s | %s" % (os.path.basename(f_a), os.path.basename(f_b)))
+    kiem("40 ký tự giống nhau: chạy lại đúng prompt cũ → đúng thư mục cũ",
+         T.App._tao_thu_muc_prompt(b_dir, 1, p_a) == f_a and
+         T.App._tao_thu_muc_prompt(b_dir, 2, p_b) == f_b,
+         str(os.listdir(b_dir)))
+    kiem("40 ký tự giống nhau: tên thư mục có mã băm phân biệt",
+         len({os.path.basename(f_a), os.path.basename(f_b)}) == 2 and
+         all(re.search(r"_[0-9a-f]{6}$", os.path.basename(f)) for f in (f_a, f_b)),
+         "%s | %s" % (os.path.basename(f_a), os.path.basename(f_b)))
 
     # ---- Folder ảnh tham chiếu: mỗi ảnh 1 video, dùng xong xoá khỏi folder
     tc_dir = os.path.join(out, "_thamchieu")

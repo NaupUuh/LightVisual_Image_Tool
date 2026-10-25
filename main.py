@@ -6,6 +6,7 @@ Chạy được trên Python 3.9 trở lên.
 """
 
 import json
+import hashlib
 import os
 import queue
 import random
@@ -18,7 +19,7 @@ import traceback
 import webbrowser
 from tkinter import filedialog, messagebox, ttk
 
-APP_VERSION = "1.0.5"
+APP_VERSION = "1.0.6"
 APP_TEN = "LightVisual Image Tool"
 
 THU_MUC_GOC = os.path.dirname(os.path.abspath(__file__))
@@ -760,13 +761,37 @@ class App(tk.Tk):
         self.ui_q.put(("dem_tc", None))
 
     @staticmethod
-    def _tao_thu_muc_prompt(goc, so, prompt):
-        """Tạo (hoặc dùng lại) thư mục con 'NN_<prompt>' cho 1 prompt.
+    def _ten_thu_muc(prompt):
+        """Tên thư mục ngắn (cắt theo TỪ) + mã băm 6 ký tự của prompt ĐẦY ĐỦ.
+
+        Chỉ cắt 40 ký tự đầu là sai: nhiều prompt khác nhau dùng chung phần mở
+        đầu (vd "photorealistic vertical breaking news broadcast studio…") nên
+        bị coi là cùng 1 prompt và dồn chung 1 thư mục. Mã băm lấy trên toàn bộ
+        prompt nên 2 prompt khác nhau luôn ra 2 thư mục khác nhau, và chạy lại
+        đúng prompt cũ vẫn nhận ra thư mục cũ.
+        """
+        day_du = api.ten_an_toan(prompt, 400)
+        tu = [t for t in day_du.split("_") if t]
+        ten = ""
+        for t in tu:
+            ung = (ten + "_" + t) if ten else t
+            if len(ung) > 48:
+                break
+            ten = ung
+        if not ten:
+            ten = (tu[0][:48] if tu else "prompt")
+        bam = hashlib.sha1((prompt or "").strip().encode("utf-8")).hexdigest()[:6]
+        return "%s_%s" % (ten, bam)
+
+    @classmethod
+    def _tao_thu_muc_prompt(cls, goc, so, prompt):
+        """Tạo (hoặc dùng lại) thư mục con 'NN_<prompt>_<hash>' cho 1 prompt.
 
         Đánh số tăng dần, không nhảy số: nếu thư mục của prompt này đã có từ lượt
         trước thì dùng lại đúng thư mục đó (dồn video mới vào cùng chỗ).
         """
-        ten = api.ten_an_toan(prompt, 40)
+        ten = cls._ten_thu_muc(prompt)
+        bam = ten.rsplit("_", 1)[-1]
         os.makedirs(goc, exist_ok=True)
         try:
             co_san = sorted(d for d in os.listdir(goc)
@@ -775,8 +800,15 @@ class App(tk.Tk):
         except Exception:
             co_san = []
         for d in co_san:                      # prompt này đã có thư mục → dùng lại
-            if d.split("_", 1)[1] == ten:
+            if d.rsplit("_", 1)[-1] == bam:
                 return os.path.join(goc, d)
+        # prompt mới → cấp số kế tiếp của dãy, không dùng lại số đã có
+        so_moi = so
+        for d in co_san:
+            m = re.match(r"^(\d{2,})_", d)
+            if m:
+                so_moi = max(so_moi, int(m.group(1)) + 1)
+        so = so_moi
         while True:
             d = "%02d_%s" % (so, ten)
             p = os.path.join(goc, d)
