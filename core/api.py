@@ -427,6 +427,68 @@ def ds_anh_trong_folder(folder):
     return ds
 
 
+TEN_FILE_PROMPT = ("prompt.txt", "prompt.md", "prompt")
+
+
+def doc_prompt_folder(folder):
+    """Prompt riêng của 1 folder: đọc prompt.txt (hoặc prompt.md / prompt).
+
+    Trả về chuỗi rỗng nếu folder không có file prompt — nơi gọi tự quyết định
+    dùng phương án dự phòng. File nhiều dòng được nối bằng dấu cách; dòng bắt
+    đầu bằng '#' là ghi chú, bỏ qua.
+    """
+    if not folder or not os.path.isdir(folder):
+        return ""
+    try:
+        ten_ds = os.listdir(folder)
+    except Exception:
+        return ""
+    for ten in sorted(ten_ds):
+        if ten.lower() not in TEN_FILE_PROMPT:
+            continue
+        p = os.path.join(folder, ten)
+        if not os.path.isfile(p):
+            continue
+        try:
+            with open(p, "r", encoding="utf-8-sig", errors="replace") as f:
+                dong = [d.strip() for d in f]
+        except Exception:
+            return ""
+        return " ".join(d for d in dong if d and not d.startswith("#")).strip()
+    return ""
+
+
+def ds_don_vi_tham_chieu(goc):
+    """Tách thư mục ảnh tham chiếu thành từng đơn vị "1 folder = 1 prompt".
+
+    Mỗi folder con (1 cấp) có ảnh là 1 đơn vị; prompt lấy từ prompt.txt trong
+    chính folder đó. Thư mục gốc không có folder con nào chứa ảnh → cả gốc là
+    1 đơn vị (giữ hành vi cũ). Ảnh nằm rời ngay trong gốc vẫn được nhận thêm
+    thành 1 đơn vị riêng, không bị bỏ sót.
+    """
+    if not goc or not os.path.isdir(goc):
+        return []
+    don = []
+    try:
+        ten_ds = sorted(os.listdir(goc))
+    except Exception:
+        return []
+    for ten in ten_ds:
+        p = os.path.join(goc, ten)
+        if not os.path.isdir(p):
+            continue
+        anh = ds_anh_trong_folder(p)
+        if anh:
+            don.append({"folder": p, "ten": ten,
+                        "prompt": doc_prompt_folder(p), "anh": anh})
+    roi = ds_anh_trong_folder(goc)
+    if roi:
+        ten_goc = os.path.basename(os.path.abspath(goc).rstrip("\\/")) or "tham_chieu"
+        don.append({"folder": goc, "ten": ten_goc,
+                    "prompt": doc_prompt_folder(goc), "anh": roi})
+    return don
+
+
 def la_goi_vo_han(plan):
     """Gói Grok Vô Hạn: plan dạng 'grok-unlimited-d<ngày>-s<luồng>'."""
     return str(plan or "").strip().lower().startswith("grok-unlimited")

@@ -1,6 +1,6 @@
 # TIẾP TỤC — LightVisual Image Tool
 
-Cập nhật: 2026-10-25 · **v1.0.6** · trạng thái: chạy thật OK với key thật (gói Grok Vô Hạn 1 ngày)
+Cập nhật: 2026-10-25 · **v1.0.7** · trạng thái: chạy thật OK với key thật (gói Grok Vô Hạn 1 ngày)
 
 ## 1. Tool này làm gì
 Tạo ảnh hàng loạt qua API lightvisual.studio (`POST /v1/images/generations`),
@@ -29,15 +29,22 @@ Gói **Grok Vô Hạn** → ảnh Grok tính **0đ**, kể cả ảnh gửi kèm
 
 ## 4. Đã kiểm chứng (chạy thật, không phải suy đoán)
 
-### 4a. Test tự động (máy chủ giả, 0đ) — v1.0.2
+### 4a. Test tự động (máy chủ giả, 0đ) — cập nhật v1.0.7
 | Test | Kết quả |
 |---|---|
 | `tests/test_mock.py` | **19/0 PASS** |
-| `tests/test_gui.py` | **68/0 PASS** |
+| `tests/test_gui.py` | **90/0 PASS** |
 | `tests/test_key_dialog.py` | **7/0 PASS** |
 | `tests/_test_update_btn.py` | **PASS** (nút Cập nhật hiện, bấm chạy được) |
 | `tests/_do_tab_tc.py` | **PASS** (tab video không cắt khung tham chiếu ở 1040x640) |
-| `py_compile` main.py + core/api.py + updater.py | OK (3.13) |
+| `py_compile` main.py + core/api.py + updater.py | OK (3.14.2 + 3.13) |
+
+Test cho "1 folder ảnh = 1 prompt" (v1.0.7) nằm trong `tests/test_gui.py`:
+`prompt.txt: tách đúng 2 folder`, `... đọc đúng prompt từng folder`, `... nhãn hiện số folder + số ảnh`,
+`... ra đúng 2 thư mục`, `... tên thư mục ra = tên folder vào`, `... số video khớp số ảnh từng folder`,
+`... mỗi folder dùng đúng prompt của mình`, `... ảnh đã dùng bị xoá khỏi folder con`,
+`thiếu prompt.txt: vẫn nhận folder / nhãn báo thiếu prompt / dùng prompt dự phòng`,
+`không prompt nào: cảnh báo, không chạy`, `ghi prompt.txt: 2 file được tạo / nội dung theo thứ tự folder`.
 
 ### 4b. Test với key thật + gói `grok-unlimited-d1-s1`
 | Việc | Kết quả đo được |
@@ -58,15 +65,32 @@ Góc phải trên, cạnh nút `API key`. Máy nào cũng chỉ cần bấm 1 l�
 - Chạy tay: `python updater.py` (chỉ kiểm tra) · `python updater.py --apply` (cập nhật).
 - `cacert.pem` đóng gói kèm để máy thiếu chứng chỉ CA vẫn gọi HTTPS được.
 
-## 5b. Folder ảnh tham chiếu (v1.0.4)
+## 5b. Folder ảnh tham chiếu (v1.0.4 → mở rộng ở v1.0.7)
 Nguồn thứ 4 trong "Nguồn cảnh đầu": **Folder ảnh tham chiếu → video**.
-- Chọn folder chứa ảnh; mỗi ảnh trong folder = **đúng 1 video** (không nhân `Video mỗi prompt`).
-- Ảnh dùng làm khung đầu (I2V) như nguồn "Ảnh khung", nhưng **dùng xong bị xoá khỏi folder** → lần sau không bao giờ lặp lại ảnh cũ.
-- Ô tích **"Xoá ảnh sau khi dùng"** mặc định BẬT; tắt đi thì ảnh giữ nguyên (dùng lại được).
-- Prompt video xoay vòng theo số ảnh; MC vẫn nối trước prompt như cũ.
-- Nhãn cạnh ô nhập hiện **"còn N ảnh"** và tự cập nhật sau mỗi ảnh xong.
+- Chọn **folder gốc**; tool quét các **folder con**, mỗi folder con là **1 đơn vị công việc**.
+- **Mỗi folder con mang prompt riêng** trong file `prompt.txt` (cũng nhận `prompt.md`, `_prompt.txt`, `prompt`).
+  Đọc cả file, bỏ dòng trắng và dòng bắt đầu bằng `#`.
+- Mỗi ảnh trong folder con = **đúng 1 video** (không nhân `Video mỗi prompt`), dùng prompt của folder đó.
+- Ảnh dùng làm khung đầu (I2V), **dùng xong bị xoá khỏi folder**; folder hết ảnh thì dừng riêng folder đó,
+  các folder khác vẫn chạy tiếp. Ô tích **"Xoá ảnh sau khi dùng"** mặc định BẬT.
+- **Thư mục ra đặt theo tên folder ảnh đầu vào**: `output/<NN>_<tên folder vào>/`. Chạy lại cùng folder
+  → dùng lại đúng thư mục đó (không tạo trùng).
+- **Folder thiếu `prompt.txt`** → lấy prompt theo **thứ tự** từ ô "2. PROMPT VIDEO" (không bị chặn);
+  nhãn sẽ báo `· N folder thiếu prompt.txt`. Nếu **không có prompt nào cả** → cảnh báo rồi dừng.
+- Nút **"Ghi prompt.txt"**: lấy danh sách prompt trên ô PROMPT VIDEO ghi lần lượt vào từng folder con
+  (bỏ qua folder đã có file) → khỏi tạo file bằng tay cho hàng chục folder.
+- Nhãn cạnh ô nhập: `<N> folder · <M> ảnh` (1 folder thì hiện `còn M ảnh`).
+- MC vẫn nối trước prompt của folder như cũ.
 - Nếu ảnh bị xoá/mất giữa lúc chạy → job đó báo LỖI "Không thấy ảnh khung", các job khác chạy tiếp.
 - "Nạp lại" lượt cũ có ảnh tham chiếu đã xoá → báo rõ, không chạy lại được (đúng thiết kế).
+
+### Lỗi đã sửa ở v1.0.7 (2026-10-25)
+Trước v1.0.7, nguồn tham chiếu chỉ có **1 folder** và prompt **xoay vòng** theo số ảnh
+(`ds_pv[(stt-1) % len(ds_pv)]`) → 10 ảnh + 2 prompt thì ảnh 1 dùng P1, ảnh 2 dùng P2, ảnh 3 lại P1…
+không gán được prompt theo từng nhóm ảnh. Nay đổi sang: **1 folder con = 1 prompt**, thư mục ra theo
+tên folder vào. Code cũ (1 folder ảnh nằm trực tiếp trong folder gốc, không có folder con) vẫn chạy được
+như trước — lúc đó đơn vị duy nhất chính là folder gốc.
+
 
 ## 5c. Thư mục con theo prompt (v1.0.5 → sửa lỗi ở v1.0.6)
 Khi tab video có **nhiều hơn 1 prompt** (sau khi đã nối MC), tool tự tạo thư mục con
@@ -110,6 +134,12 @@ trong thư mục nào**.
 2. Bắn 2 job video liên tiếp trên gói 1 luồng dễ gặp `"Model đang bị giới hạn tốc độ"` — chờ vài giây rồi chạy lại.
 3. Gói hết hạn thì `/v1/balance` vẫn trả 200 nhưng sẽ bị trừ credit — kiểm tra số dư định kỳ.
 4. Chưa test video 15 s / 1080p thật (tốn credit); preset đã set sẵn 15 s / 1080p / 9:16 / 4 video mỗi prompt.
+5. Chưa chạy thật "1 folder ảnh = 1 prompt" với ảnh thật (test mới chỉ dùng máy chủ giả) — anh chạy
+   thử 1 folder nhỏ (2–3 ảnh) rồi xem lại tên thư mục ra có đúng tên folder vào không.
+6. `output/` còn 2 thư mục cũ (`01_photorealistic_vertical_breaking_news_br`,
+   `02_9_16_vertical_no_logos_photorealistic_tv`) bị **gộp sai prompt** từ trước bản 1.0.6 — dữ liệu
+   lịch sử, chưa dọn; code mới không ghi vào 2 thư mục đó nữa.
+
 
 ## 7. Lệnh hay dùng
 ```

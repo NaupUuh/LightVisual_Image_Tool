@@ -19,7 +19,7 @@ import traceback
 import webbrowser
 from tkinter import filedialog, messagebox, ttk
 
-APP_VERSION = "1.0.6"
+APP_VERSION = "1.0.7"
 APP_TEN = "LightVisual Image Tool"
 
 THU_MUC_GOC = os.path.dirname(os.path.abspath(__file__))
@@ -628,6 +628,7 @@ class App(tk.Tk):
         self.e_thamchieu.bind("<FocusOut>", lambda e: self._cap_nhat_dem_tham_chieu())
         ttk.Button(tc, text="...", width=3, command=self._chon_tham_chieu).pack(side="left", padx=6)
         ttk.Button(tc, text="Xem", width=5, command=self._xem_tham_chieu).pack(side="left")
+        ttk.Button(tc, text="Ghi prompt.txt", command=self._ghi_prompt_txt).pack(side="left", padx=(6, 0))
         self.var_xtc = tk.BooleanVar(value=bool(self.cfg.get("video_xoa_tham_chieu", True)))
         ttk.Checkbutton(tc, text="Xoá ảnh sau khi dùng", variable=self.var_xtc,
                         command=self._luu_tuy_chon_video).pack(side="left", padx=(10, 0))
@@ -717,6 +718,11 @@ class App(tk.Tk):
         p = self.e_thamchieu.get().strip() if hasattr(self, "e_thamchieu") else ""
         return api.ds_anh_trong_folder(p) if p else []
 
+    def _ds_don_vi_tham_chieu(self):
+        """Mỗi folder con = 1 prompt riêng (prompt.txt trong folder)."""
+        p = self.e_thamchieu.get().strip() if hasattr(self, "e_thamchieu") else ""
+        return api.ds_don_vi_tham_chieu(p) if p else []
+
     def _cap_nhat_dem_tham_chieu(self):
         if not hasattr(self, "lbl_tc"):
             return
@@ -726,8 +732,16 @@ class App(tk.Tk):
         elif not os.path.isdir(p):
             self.lbl_tc.configure(text="không thấy folder")
         else:
-            n = len(api.ds_anh_trong_folder(p))
-            self.lbl_tc.configure(text="còn %d ảnh" % n)
+            don = api.ds_don_vi_tham_chieu(p)
+            n = sum(len(d["anh"]) for d in don)
+            thieu = [d["ten"] for d in don if not d["prompt"]]
+            if len(don) <= 1:
+                chu = "còn %d ảnh" % n
+            else:
+                chu = "%d folder · %d ảnh" % (len(don), n)
+            if thieu:
+                chu += " · %d folder thiếu prompt.txt" % len(thieu)
+            self.lbl_tc.configure(text=chu)
         self._cap_nhat_phi_video()
 
     def _chon_tham_chieu(self):
@@ -747,6 +761,43 @@ class App(tk.Tk):
             return
         self._mo_thu_muc(p)
 
+    def _ghi_prompt_txt(self):
+        """Ghi prompt.txt vào từng folder con — mỗi folder 1 prompt, lấy theo thứ tự
+        từ ô '2. PROMPT VIDEO' (hoặc giữ nguyên file đã có nếu không đủ prompt)."""
+        goc = self.e_thamchieu.get().strip()
+        if not goc or not os.path.isdir(goc):
+            messagebox.showinfo(APP_TEN, "Chưa chọn folder ảnh tham chiếu.")
+            return
+        don = api.ds_don_vi_tham_chieu(goc)
+        if not don:
+            messagebox.showinfo(APP_TEN, "Folder này không có ảnh nào để ghi prompt.")
+            return
+        ds_pv = self._ds_prompt_video()
+        if not ds_pv:
+            messagebox.showwarning(APP_TEN, "Chưa có prompt video để ghi.\n"
+                                            "Nhập prompt ở ô '2. PROMPT VIDEO' trước.")
+            return
+        da_co = sum(1 for d in don if d["prompt"])
+        if da_co and not messagebox.askyesno(
+                APP_TEN, "%d/%d folder đã có prompt.txt.\nGhi đè bằng prompt lấy theo "
+                         "thứ tự từ ô PROMPT VIDEO?" % (da_co, len(don))):
+            return
+        n = 0
+        for k, d in enumerate(don):
+            noi_dung = ds_pv[k % len(ds_pv)]
+            try:
+                with open(os.path.join(d["folder"], "prompt.txt"), "w",
+                          encoding="utf-8") as f:
+                    f.write(noi_dung + "\n")
+                n += 1
+            except Exception as e:
+                self._log("Không ghi được prompt.txt vào %s (%s)" % (d["ten"], e))
+        self._cap_nhat_dem_tham_chieu()
+        self._log("Đã ghi prompt.txt cho %d/%d folder (%d prompt nguồn)." %
+                  (n, len(don), len(ds_pv)))
+        messagebox.showinfo(APP_TEN, "Đã ghi prompt.txt cho %d/%d folder.\n"
+                                     "Mở folder kiểm tra/sửa lại từng prompt nếu cần." % (n, len(don)))
+
     def _mo_thu_muc(self, p):
         mo_folder(p)
 
@@ -761,16 +812,9 @@ class App(tk.Tk):
         self.ui_q.put(("dem_tc", None))
 
     @staticmethod
-    def _ten_thu_muc(prompt):
-        """Tên thư mục ngắn (cắt theo TỪ) + mã băm 6 ký tự của prompt ĐẦY ĐỦ.
-
-        Chỉ cắt 40 ký tự đầu là sai: nhiều prompt khác nhau dùng chung phần mở
-        đầu (vd "photorealistic vertical breaking news broadcast studio…") nên
-        bị coi là cùng 1 prompt và dồn chung 1 thư mục. Mã băm lấy trên toàn bộ
-        prompt nên 2 prompt khác nhau luôn ra 2 thư mục khác nhau, và chạy lại
-        đúng prompt cũ vẫn nhận ra thư mục cũ.
-        """
-        day_du = api.ten_an_toan(prompt, 400)
+    def _slug_ten(nguon):
+        """Vài từ đầu (cắt theo TỪ, không cắt giữa từ) của 1 chuỗi."""
+        day_du = api.ten_an_toan(nguon, 400)
         tu = [t for t in day_du.split("_") if t]
         ten = ""
         for t in tu:
@@ -780,17 +824,40 @@ class App(tk.Tk):
             ten = ung
         if not ten:
             ten = (tu[0][:48] if tu else "prompt")
-        bam = hashlib.sha1((prompt or "").strip().encode("utf-8")).hexdigest()[:6]
-        return "%s_%s" % (ten, bam)
+        return ten
 
     @classmethod
-    def _tao_thu_muc_prompt(cls, goc, so, prompt):
-        """Tạo (hoặc dùng lại) thư mục con 'NN_<prompt>_<hash>' cho 1 prompt.
+    def _ten_thu_muc(cls, prompt):
+        """Tên thư mục ngắn (cắt theo TỪ) + mã băm 6 ký tự của prompt ĐẦY ĐỦ.
 
-        Đánh số tăng dần, không nhảy số: nếu thư mục của prompt này đã có từ lượt
-        trước thì dùng lại đúng thư mục đó (dồn video mới vào cùng chỗ).
+        Chỉ cắt 40 ký tự đầu là sai: nhiều prompt khác nhau dùng chung phần mở
+        đầu (vd "photorealistic vertical breaking news broadcast studio…") nên
+        bị coi là cùng 1 prompt và dồn chung 1 thư mục. Mã băm lấy trên toàn bộ
+        prompt nên 2 prompt khác nhau luôn ra 2 thư mục khác nhau, và chạy lại
+        đúng prompt cũ vẫn nhận ra thư mục cũ.
         """
-        ten = cls._ten_thu_muc(prompt)
+        bam = hashlib.sha1((prompt or "").strip().encode("utf-8")).hexdigest()[:6]
+        return "%s_%s" % (cls._slug_ten(prompt), bam)
+
+    @classmethod
+    def _ten_thu_muc_folder(cls, ten_folder):
+        """Tên thư mục ra đặt theo ĐÚNG tên folder ảnh đầu vào (+ băm 6 ký tự).
+
+        Băm lấy trên tên folder (không phải trên prompt) để chạy lại bao nhiêu
+        lần cũng về đúng thư mục cũ, và 2 folder khác tên nhưng ra cùng slug
+        vẫn không bị gộp.
+        """
+        ten = (ten_folder or "").strip() or "tham_chieu"
+        bam = hashlib.sha1(("folder:" + ten).encode("utf-8")).hexdigest()[:6]
+        return "%s_%s" % (cls._slug_ten(ten), bam)
+
+    @classmethod
+    def _cap_thu_muc(cls, goc, so, ten):
+        """Tạo (hoặc dùng lại) thư mục con 'NN_<ten>' — đánh số tăng dần.
+
+        Đánh số không nhảy số, không trùng: thư mục đã có (khớp mã băm cuối tên)
+        thì dùng lại đúng thư mục đó để dồn video mới vào cùng chỗ.
+        """
         bam = ten.rsplit("_", 1)[-1]
         os.makedirs(goc, exist_ok=True)
         try:
@@ -799,10 +866,10 @@ class App(tk.Tk):
                             re.match(r"^\d{2,}_", d))
         except Exception:
             co_san = []
-        for d in co_san:                      # prompt này đã có thư mục → dùng lại
+        for d in co_san:                      # đã có thư mục cho mục này → dùng lại
             if d.rsplit("_", 1)[-1] == bam:
                 return os.path.join(goc, d)
-        # prompt mới → cấp số kế tiếp của dãy, không dùng lại số đã có
+        # mục mới → cấp số kế tiếp của dãy, không dùng lại số đã có
         so_moi = so
         for d in co_san:
             m = re.match(r"^(\d{2,})_", d)
@@ -810,12 +877,21 @@ class App(tk.Tk):
                 so_moi = max(so_moi, int(m.group(1)) + 1)
         so = so_moi
         while True:
-            d = "%02d_%s" % (so, ten)
-            p = os.path.join(goc, d)
+            p = os.path.join(goc, "%02d_%s" % (so, ten))
             if not os.path.exists(p):
                 os.makedirs(p, exist_ok=True)
                 return p
-            so += 1                           # trùng tên khác prompt → nhảy số
+            so += 1                           # trùng tên khác nguồn → nhảy số
+
+    @classmethod
+    def _tao_thu_muc_prompt(cls, goc, so, prompt):
+        """Tạo (hoặc dùng lại) thư mục con 'NN_<prompt>_<hash>' cho 1 prompt."""
+        return cls._cap_thu_muc(goc, so, cls._ten_thu_muc(prompt))
+
+    @classmethod
+    def _tao_thu_muc_folder(cls, goc, so, ten_folder):
+        """Tạo (hoặc dùng lại) thư mục con đặt theo tên folder ảnh đầu vào."""
+        return cls._cap_thu_muc(goc, so, cls._ten_thu_muc_folder(ten_folder))
 
     def _cap_nhat_dem_khung(self):
         self.lbl_khung.configure(text="%d ảnh" % self.lst_khung.size())
@@ -983,9 +1059,13 @@ class App(tk.Tk):
             mo_ta = "%d prompt ảnh × %d" % (n_ia, moi)
             co_khung = True          # có phí ảnh khung phải tạo
         elif self._dang_chon_tham_chieu():
-            n_tc = len(self._ds_tham_chieu())
+            don = self._ds_don_vi_tham_chieu()
+            n_tc = sum(len(d["anh"]) for d in don)
             so_video = max(1, n_tc)
-            mo_ta = "%d ảnh tham chiếu × 1" % n_tc
+            if len(don) > 1:
+                mo_ta = "%d folder × %d ảnh" % (len(don), n_tc)
+            else:
+                mo_ta = "%d ảnh tham chiếu × 1" % n_tc
             co_khung = n_tc > 0
         else:
             so_video = max(1, so_prompt) * moi
@@ -1437,7 +1517,7 @@ class App(tk.Tk):
         ds_pv = self._ds_prompt_video()
         ds_pa = self._ds_prompt_anh()
         ds_mc = self._ds_mc()
-        ds_tc = self._ds_tham_chieu() if self._dang_chon_tham_chieu() else []
+        ds_don_vi = self._ds_don_vi_tham_chieu() if self._dang_chon_tham_chieu() else []
         ds_goc = []
 
         # kiểm tra đầu vào theo nguồn
@@ -1460,12 +1540,16 @@ class App(tk.Tk):
             if not self.e_thamchieu.get().strip():
                 messagebox.showwarning(APP_TEN, "Chưa chọn folder ảnh tham chiếu.")
                 return
-            if not ds_tc:
+            if not ds_don_vi:
                 messagebox.showinfo(APP_TEN, "Folder ảnh tham chiếu đã hết ảnh.\n"
                                              "Chọn folder khác hoặc thêm ảnh vào folder.")
                 return
-            if not ds_pv:
-                messagebox.showwarning(APP_TEN, "Chưa có prompt video.")
+            # prompt của mỗi folder: prompt.txt trong folder; thiếu thì lấy theo
+            # thứ tự từ danh sách prompt video trên GUI
+            if not any(d["prompt"] for d in ds_don_vi) and not ds_pv:
+                messagebox.showwarning(
+                    APP_TEN, "Chưa có prompt.\nMỗi folder cần 1 file prompt.txt, "
+                             "hoặc nhập prompt video ở ô '2. PROMPT VIDEO'.")
                 return
         else:
             if not ds_pv:
@@ -1510,14 +1594,21 @@ class App(tk.Tk):
                                  "khung": "", "prompt_anh": p_a,
                                  "lan": j + 1, "moi": moi, "nhan": p_a[:40]})
         elif nguon == api.DS_NGUON[3]:
-            # mỗi ảnh tham chiếu → đúng 1 video; ảnh dùng xong bị xoá khỏi folder
-            for p_anh in ds_tc:
-                stt += 1
-                viec.append({"stt": stt, "prompt": ds_pv[(stt - 1) % len(ds_pv)],
-                             "khung": p_anh, "prompt_anh": "",
-                             "lan": 1, "moi": 1,
-                             "nhan": os.path.basename(p_anh),
-                             "xoa_sau": bool(self.var_xtc.get())})
+            # mỗi folder ảnh = 1 prompt riêng (prompt.txt); mỗi ảnh → 1 video;
+            # ảnh dùng xong bị xoá khỏi folder. Thiếu prompt.txt thì lấy prompt
+            # theo thứ tự từ danh sách prompt video trên GUI.
+            k_folder = 0
+            for d in ds_don_vi:
+                prompt_dv = d["prompt"] or (ds_pv[k_folder % len(ds_pv)] if ds_pv else "")
+                k_folder += 1
+                for p_anh in d["anh"]:
+                    stt += 1
+                    viec.append({"stt": stt, "prompt": prompt_dv,
+                                 "khung": p_anh, "prompt_anh": "",
+                                 "lan": 1, "moi": 1,
+                                 "nhan": os.path.basename(p_anh),
+                                 "folder_vao": d["ten"],
+                                 "xoa_sau": bool(self.var_xtc.get())})
         else:
             for p in ds_pv:
                 for j in range(moi):
@@ -1545,7 +1636,19 @@ class App(tk.Tk):
             g = v.get("prompt_goc") or v["prompt"]
             if g not in ds_goc:
                 ds_goc.append(g)
-        if len(ds_goc) > 1:
+        if nguon == api.DS_NGUON[3] and ds_don_vi:
+            # thư mục ra đặt theo ĐÚNG tên folder ảnh đầu vào (1 folder vào → 1 folder ra)
+            ban_do = {}
+            for k, d in enumerate(ds_don_vi):
+                ban_do[d["ten"]] = self._tao_thu_muc_folder(thu_muc, k + 1, d["ten"])
+            for v in viec:
+                v["thu_muc"] = ban_do.get(v.get("folder_vao")) or thu_muc
+            self._log("Chia %d video vào %d thư mục con (theo tên folder ảnh đầu vào):" %
+                      (len(viec), len(ban_do)))
+            for d in ds_don_vi:
+                self._log("   %s  ←  %s (%d ảnh)" %
+                          (os.path.basename(ban_do[d["ten"]]), d["ten"], len(d["anh"])))
+        elif len(ds_goc) > 1:
             ban_do = {}
             for k, g in enumerate(ds_goc):
                 ban_do[g] = self._tao_thu_muc_prompt(thu_muc, k + 1, g)

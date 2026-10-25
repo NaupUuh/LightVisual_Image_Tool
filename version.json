@@ -1,5 +1,5 @@
 {
-  "version": "1.0.6",
-  "notes": "1.0.6: Sua loi thu muc con theo prompt bi gop sai. Truoc day ten thu muc bi cat con 40 ky tu nen nhieu prompt khac nhau nhung giong 40 ky tu dau (vd cung mo 'photorealistic vertical breaking news...') bi coi la 1 prompt va don chung 1 thu muc. Nay ten thu muc = <tu dau cua prompt>_<ma bam 6 ky tu cua prompt day du>, nen moi prompt khac nhau luon ra thu muc rieng; chay lai dung prompt cu van dung lai thu muc cu. So thu muc tang dan va khong trung so ke ca khi chen prompt moi vao giua danh sach.",
+  "version": "1.0.7",
+  "notes": "1.0.7: Nguon 'Folder anh tham chieu' gio gan 1 prompt theo TUNG folder anh. Chon folder goc, tool quet cac folder con, moi folder con doc prompt rieng tu file prompt.txt (cung nhan prompt.md/_prompt.txt/prompt). Moi anh trong folder = 1 video dung prompt cua folder do, anh dung xong van bi xoa. Thu muc ra dat theo TEN folder anh dau vao (NN_<ten folder vao>) va chay lai thi dung lai thu muc cu. Folder thieu prompt.txt thi lay prompt theo thu tu o PROMPT VIDEO (nhan bao ro so folder thieu). Them nut 'Ghi prompt.txt' de ghi nhanh prompt tu o PROMPT VIDEO vao tung folder con.",
   "date": "2026-10-25"
 }

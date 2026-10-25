@@ -68,6 +68,27 @@ Ví dụ prompt:
 - Log chi tiết từng request, kể cả khi đổi key.
 - Nút **Dừng**: ngừng nhận việc mới, các luồng đang chạy kết thúc rồi mới dừng hẳn.
 
+## 6. Tab "2. Ảnh → Video" — nguồn "Folder ảnh tham chiếu"
+
+Mỗi **folder con** là **1 prompt riêng**; ảnh trong folder đó dùng đúng prompt của nó.
+
+```
+Folder gốc\
+├─ 01_senate_vote\
+│   ├─ prompt.txt     ← nội dung file chính là prompt video
+│   ├─ a1.jpg
+│   └─ a2.jpg
+└─ 02_hurricane\
+    ├─ prompt.txt
+    └─ b1.jpg
+```
+
+- Mỗi ảnh = **1 video**; ảnh dùng xong **bị xoá khỏi folder** (ô tích "Xoá ảnh sau khi dùng").
+- Thư mục ra đặt **theo tên folder ảnh vào**: `output\01_senate_vote\...mp4`.
+- Folder nào **thiếu `prompt.txt`** thì lấy prompt theo thứ tự ở ô "PROMPT VIDEO"
+  (nhãn sẽ báo `· N folder thiếu prompt.txt`).
+- Nút **"Ghi prompt.txt"**: ghi danh sách prompt ở ô PROMPT VIDEO vào từng folder con (bỏ qua folder đã có file).
+
 ## 7. Lỗi thường gặp
 
 | Hiện tượng | Nguyên nhân / cách xử lý |

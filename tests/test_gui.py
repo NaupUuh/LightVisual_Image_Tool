@@ -453,6 +453,154 @@ def main():
     kiem("tham chieu: nhãn về 0 ảnh", "còn 0 ảnh" in app.lbl_tc.cget("text"),
          app.lbl_tc.cget("text"))
 
+    # ---- Mỗi folder ảnh 1 prompt riêng (prompt.txt) + thư mục ra theo tên folder vào
+    tc2 = os.path.join(out, "_tc_nhieu")
+    os.makedirs(tc2, exist_ok=True)
+    bo = {"senate_vote": ("PROMPT SENATE", 2), "hurricane": ("PROMPT HURRICANE", 3)}
+    for ten_f, (prompt_f, n_f) in bo.items():
+        d_f = os.path.join(tc2, ten_f)
+        os.makedirs(d_f, exist_ok=True)
+        with open(os.path.join(d_f, "prompt.txt"), "w", encoding="utf-8") as fh:
+            fh.write(prompt_f + chr(10))
+        for k in range(n_f):
+            with open(os.path.join(d_f, "a%d.png" % k), "wb") as fh:
+                fh.write(ANH)
+    don = T.api.ds_don_vi_tham_chieu(tc2)
+    kiem("prompt.txt: tách đúng 2 folder", len(don) == 2, str([d["ten"] for d in don]))
+    kiem("prompt.txt: đọc đúng prompt từng folder",
+         {d["ten"]: d["prompt"] for d in don} == {k: v[0] for k, v in bo.items()},
+         str({d["ten"]: d["prompt"] for d in don}))
+    kiem("prompt.txt: đếm ảnh từng folder",
+         {d["ten"]: len(d["anh"]) for d in don} == {k: v[1] for k, v in bo.items()},
+         str({d["ten"]: len(d["anh"]) for d in don}))
+
+    tc3 = os.path.join(out, "_tc_nhieu_ra")
+    os.makedirs(tc3, exist_ok=True)
+    app.cb_vnguon.set(T.api.DS_NGUON[3])
+    app.e_thamchieu.delete(0, "end")
+    app.e_thamchieu.insert(0, tc2)
+    app.e_vra.delete(0, "end")
+    app.e_vra.insert(0, tc3)
+    app._doi_nguon()
+    app._cap_nhat_dem_tham_chieu()
+    kiem("prompt.txt: nhãn hiện số folder + số ảnh",
+         "2 folder" in app.lbl_tc.cget("text") and "5 ảnh" in app.lbl_tc.cget("text"),
+         app.lbl_tc.cget("text"))
+    kiem("prompt.txt: ước tính 5 video", "5 video" in app.lbl_phi_video.cget("text"),
+         app.lbl_phi_video.cget("text"))
+    app.var_xtc.set(True)
+    app.txt_prompt_video.delete("1.0", "end")
+    app.txt_prompt_video.insert("1.0", "KHONG DUNG" + chr(10))
+    app.txt_mc.delete("1.0", "end")
+    DEM["video"] = 0
+    DEM.pop("prompts", None)
+    app.cfg["api_key"] = "LV_ok"
+    app.nb.select(1)
+    app._bam_chay()
+    t0 = time.time()
+    while app.dang_chay and time.time() - t0 < 60:
+        app.update()
+        time.sleep(0.03)
+    for _ in range(30):
+        app.update()
+        time.sleep(0.02)
+    subs_tc = sorted(d for d in os.listdir(tc3) if os.path.isdir(os.path.join(tc3, d)))
+    kiem("prompt.txt: ra đúng 2 thư mục", len(subs_tc) == 2, str(subs_tc))
+    kiem("prompt.txt: tên thư mục ra = tên folder vào",
+         all(any(t in d for d in subs_tc) for t in bo), str(subs_tc))
+    mp4_tc = {d: len([f for f in os.listdir(os.path.join(tc3, d)) if f.endswith(".mp4")])
+              for d in subs_tc}
+    kiem("prompt.txt: số video khớp số ảnh từng folder",
+         sorted(mp4_tc.values()) == [2, 3], str(mp4_tc))
+    gui_tc = DEM.get("prompts") or []
+    kiem("prompt.txt: mỗi folder dùng đúng prompt của mình",
+         sorted(gui_tc) == ["PROMPT HURRICANE", "PROMPT HURRICANE", "PROMPT HURRICANE",
+                            "PROMPT SENATE", "PROMPT SENATE"], str(gui_tc))
+    kiem("prompt.txt: ảnh đã dùng bị xoá khỏi folder con",
+         all(os.listdir(os.path.join(tc2, t)) in ([], ["prompt.txt"]) for t in bo),
+         str({t: os.listdir(os.path.join(tc2, t)) for t in bo}))
+
+    # ---- Folder thiếu prompt.txt → lấy prompt theo thứ tự từ ô PROMPT VIDEO
+    tc4 = os.path.join(out, "_tc_thieu_prompt")
+    os.makedirs(tc4, exist_ok=True)
+    for ten_f in ("khong_co_prompt",):
+        d_f = os.path.join(tc4, ten_f)
+        os.makedirs(d_f, exist_ok=True)
+        for k in range(2):
+            with open(os.path.join(d_f, "b%d.png" % k), "wb") as fh:
+                fh.write(ANH)
+    don4 = T.api.ds_don_vi_tham_chieu(tc4)
+    kiem("thiếu prompt.txt: vẫn nhận folder",
+         len(don4) == 1 and don4[0]["prompt"] == "" and len(don4[0]["anh"]) == 2, str(don4))
+    app.cb_vnguon.set(T.api.DS_NGUON[3])
+    app.e_thamchieu.delete(0, "end")
+    app.e_thamchieu.insert(0, tc4)
+    app._doi_nguon()
+    app._cap_nhat_dem_tham_chieu()
+    kiem("thiếu prompt.txt: nhãn báo thiếu prompt",
+         "thiếu prompt.txt" in app.lbl_tc.cget("text"), app.lbl_tc.cget("text"))
+    app.txt_prompt_video.delete("1.0", "end")
+    app.txt_prompt_video.insert("1.0", "DU PHONG" + chr(10))
+    DEM["video"] = 0
+    DEM.pop("prompts", None)
+    app.cfg["api_key"] = "LV_ok"
+    app.nb.select(1)
+    app._bam_chay()
+    t0 = time.time()
+    while app.dang_chay and time.time() - t0 < 40:
+        app.update()
+        time.sleep(0.03)
+    for _ in range(30):
+        app.update()
+        time.sleep(0.02)
+    kiem("thiếu prompt.txt: dùng prompt dự phòng",
+         (DEM.get("prompts") or []) == ["DU PHONG", "DU PHONG"], str(DEM.get("prompts")))
+
+    # ---- Không có prompt nào (folder thiếu prompt.txt + ô PROMPT VIDEO trống) → cảnh báo
+    cu_w = T.messagebox.showwarning
+    dem_w = [0]
+    T.messagebox.showwarning = lambda *a, **k: dem_w.__setitem__(0, dem_w[0] + 1)
+    try:
+        tc5 = os.path.join(out, "_tc_khong_prompt")
+        os.makedirs(os.path.join(tc5, "f1"), exist_ok=True)
+        with open(os.path.join(tc5, "f1", "c.png"), "wb") as fh:
+            fh.write(ANH)
+        app.e_thamchieu.delete(0, "end")
+        app.e_thamchieu.insert(0, tc5)
+        app.txt_prompt_video.delete("1.0", "end")
+        app.nb.select(1)          # lượt chạy trước tự nhảy sang tab Kết quả
+        app._bam_chay()
+    finally:
+        T.messagebox.showwarning = cu_w
+    kiem("không prompt nào: cảnh báo, không chạy", dem_w[0] >= 1 and not app.dang_chay,
+         str(dem_w[0]))
+
+    # ---- Nút 'Ghi prompt.txt' tạo file cho từng folder con
+    tc6 = os.path.join(out, "_tc_ghi")
+    for ten_f in ("alpha", "beta"):
+        d_f = os.path.join(tc6, ten_f)
+        os.makedirs(d_f, exist_ok=True)
+        with open(os.path.join(d_f, "d.png"), "wb") as fh:
+            fh.write(ANH)
+    app.e_thamchieu.delete(0, "end")
+    app.e_thamchieu.insert(0, tc6)
+    app.txt_prompt_video.delete("1.0", "end")
+    app.txt_prompt_video.insert("1.0", "GHI MOT" + chr(10) + "GHI HAI" + chr(10))
+    cu_i = T.messagebox.showinfo
+    T.messagebox.showinfo = lambda *a, **k: None
+    try:
+        app._ghi_prompt_txt()
+    finally:
+        T.messagebox.showinfo = cu_i
+    kiem("ghi prompt.txt: 2 file được tạo",
+         all(os.path.isfile(os.path.join(tc6, t, "prompt.txt")) for t in ("alpha", "beta")),
+         str({t: os.listdir(os.path.join(tc6, t)) for t in ("alpha", "beta")}))
+    kiem("ghi prompt.txt: nội dung theo thứ tự folder",
+         T.api.doc_prompt_folder(os.path.join(tc6, "alpha")) == "GHI MOT" and
+         T.api.doc_prompt_folder(os.path.join(tc6, "beta")) == "GHI HAI",
+         "%s | %s" % (T.api.doc_prompt_folder(os.path.join(tc6, "alpha")),
+                      T.api.doc_prompt_folder(os.path.join(tc6, "beta"))))
+
     # ---- Dừng → Tiếp tục: không làm lại việc đã OK, không mất việc
     app.cb_vnguon.set(T.api.DS_NGUON[0])
     app._doi_nguon()
