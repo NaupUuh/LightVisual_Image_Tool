@@ -133,6 +133,40 @@ def goi(token, method, tham_so=None, timeout=25):
         return False, str(e)[:200]
 
 
+def dat_lenh(token, ds=None):
+    """Đăng ký menu lệnh -> gõ '/' trong nhóm là hiện danh sách để bấm.
+
+    ds: [{"command": "baocao", "description": "..."}, ...]
+    Trả (ok, lỗi).
+    """
+    ds = ds or [
+        {"command": "baocao", "description": "Báo cáo tiến độ ngay"},
+        {"command": "trangthai", "description": "Đang chạy hay đang rảnh"},
+        {"command": "giup", "description": "Hướng dẫn dùng bot"},
+    ]
+    sach = []
+    for c in ds:
+        ten = str((c or {}).get("command") or "").strip().lstrip("/")
+        mo = str((c or {}).get("description") or "").strip()
+        if not ten or not mo:
+            continue
+        sach.append({"command": ten[:32], "description": mo[:256]})
+    if not sach:
+        return False, "không có lệnh nào để đăng ký"
+    return goi(token, "setMyCommands", {"commands": sach,
+                                        "scope": {"type": "all_group_chats"}},
+               timeout=20)
+
+
+def lay_lenh(token):
+    """Đọc menu lệnh đã đăng ký. Trả (ok, list | lỗi)."""
+    ok, kq = goi(token, "getMyCommands",
+                 {"scope": {"type": "all_group_chats"}}, timeout=15)
+    if not ok:
+        return False, kq
+    return True, kq or []
+
+
 def get_me(token):
     """Trả (ok, {'username':..., 'id':...} | lỗi)."""
     ok, kq = goi(token, "getMe", None, timeout=15)
@@ -269,6 +303,22 @@ def la_lenh_baocao(text, bot_username=""):
             return False
         phan = ten
     return phan.strip().lower() in ("baocao", "bc", "report")
+
+
+def lenh_nao(text, bot_username=""):
+    """Trả tên lệnh (không dấu /, không @bot) nếu text là lệnh gửi cho bot này."""
+    t = (text or "").strip()
+    if not t.startswith("/"):
+        return ""
+    phan = t.split()[0][1:]
+    if not phan:
+        return ""
+    if "@" in phan:
+        ten, _, ai = phan.partition("@")
+        if bot_username and ai.strip().lower() != bot_username.strip().lower():
+            return ""
+        phan = ten
+    return phan.strip().lower()
 
 
 def lay_nhom(token, giay=10.0, offset=0, log=None):
@@ -424,9 +474,10 @@ class TheoDoi(object):
     Gọi khi_lenh(chat_id, ten_nhom) mỗi lần có lệnh. Tự lưu offset.
     """
 
-    def __init__(self, token="", khi_lenh=None, log=None, timeout=25):
+    def __init__(self, token="", khi_lenh=None, log=None, timeout=25, khi_khac=None):
         self.token = lay_token(token)
         self.khi_lenh = khi_lenh
+        self.khi_khac = khi_khac        # (chat_id, ten_nhom, ten_lenh) cho lệnh khác
         self.log = log or (lambda *a, **k: None)
         self.timeout = max(5, int(timeout))
         self.nhom = {}
@@ -455,6 +506,10 @@ class TheoDoi(object):
                 self.log("Telegram: bot đang BẬT chế độ riêng tư nên chỉ nhận lệnh "
                          "dạng /baocao@%s. Muốn gõ /baocao trần: BotFather -> "
                          "/setprivacy -> chọn bot -> Disable." % self.bot_username)
+        # đăng ký menu lệnh để gõ "/" trong nhóm là hiện sẵn để bấm
+        ok_lenh, loi_lenh = dat_lenh(self.token)
+        if not ok_lenh:
+            self.log("Telegram: không đăng ký được menu lệnh — %s" % loi_lenh)
         self._t = threading.Thread(target=self._loop)
         self._t.daemon = True
         self._t.start()
@@ -527,11 +582,21 @@ class TheoDoi(object):
                 if not self.khi_lenh:
                     continue
                 txt = text_cua_update(up)
-                if la_lenh_baocao(txt, self.bot_username):
-                    cid = str((c or {}).get("id") or "")
-                    # chỉ nhận lệnh trong nhóm/kênh, bỏ qua chat riêng
-                    if cid and str((c or {}).get("type")) in LOAI_NHOM:
+                lenh = lenh_nao(txt, self.bot_username)
+                if not lenh:
+                    continue
+                cid = str((c or {}).get("id") or "")
+                # chỉ nhận lệnh trong nhóm/kênh, bỏ qua chat riêng
+                if not cid or str((c or {}).get("type")) not in LOAI_NHOM:
+                    continue
+                if lenh in ("baocao", "bc", "report"):
+                    if self.khi_lenh:
                         try:
                             self.khi_lenh(cid, ten_nhom(c))
                         except Exception:
                             pass
+                elif self.khi_khac:
+                    try:
+                        self.khi_khac(cid, ten_nhom(c), lenh)
+                    except Exception:
+                        pass

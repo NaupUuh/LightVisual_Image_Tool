@@ -1,4 +1,4 @@
 {
-  "version": "1.0.13",
-  "notes": "1.0.13: Sua loi 'bot khong chay' - gap 409 Conflict la tat luong nghe lenh VINH VIEN. Gio thu lai 5 lan voi backoff 3/6/9/12s; chi bo cuoc khi tranh chap lien tuc 5 lan. Them: _bat_theo_doi chay o luong nen nen nut Luu khong dung hinh khi phai cho long-poll cu nha ket noi."
+  "version": "1.0.14",
+  "notes": "v1.0.14: go '/' la hien menu lenh (/baocao, /trangthai, /giup) de bam chon; them lenh /trangthai va /giup; bot nao go @bot do. v1.0.13: fix 409 lam tat luong nghe vinh vien -> thu lai 5 lan."
 }

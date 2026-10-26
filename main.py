@@ -19,7 +19,7 @@ import traceback
 import webbrowser
 from tkinter import filedialog, messagebox, ttk
 
-APP_VERSION = "1.0.13"
+APP_VERSION = "1.0.14"
 APP_TEN = "LightVisual Image Tool"
 
 THU_MUC_GOC = os.path.dirname(os.path.abspath(__file__))
@@ -1606,6 +1606,7 @@ class App(tk.Tk):
                 if not self._dung_theo_doi():
                     return
                 td = tele.TheoDoi(tok, khi_lenh=self._co_lenh_baocao,
+                                  khi_khac=self._co_lenh_khac,
                                   log=lambda s: self.ui_q.put(("log", s)))
                 td.offset = offset
                 if td.bat_dau():
@@ -1633,6 +1634,10 @@ class App(tk.Tk):
     def _co_lenh_baocao(self, chat_id, ten):
         """Chạy trong luồng polling -> chỉ đẩy vào hàng đợi UI."""
         self.ui_q.put(("tele_lenh", (str(chat_id), ten or "")))
+
+    def _co_lenh_khac(self, chat_id, ten, lenh):
+        """Lệnh khác (/trangthai, /giup) — chạy trong luồng polling -> đẩy vào UI."""
+        self.ui_q.put(("tele_lenh_khac", (str(chat_id), ten or "", str(lenh))))
 
     def _tra_loi_baocao(self, chat_id, ten):
         """Soạn và gửi báo cáo ngay cho 1 nhóm (chạy ở luồng GUI)."""
@@ -1666,6 +1671,43 @@ class App(tk.Tk):
         def chay():
             ok, loi = tele.gui(tok, chat_id, text)
             self.ui_q.put(("tele_thu", (ok, loi, ten or chat_id)))
+        threading.Thread(target=chay, daemon=True).start()
+
+    def _tra_loi_lenh_khac(self, chat_id, ten, lenh):
+        """Xử lý /trangthai, /giup (và lệnh lạ) — chạy ở luồng GUI."""
+        tok = (self.cfg.get("tele_token") or "").strip()
+        if not tok:
+            return
+        if lenh in ("trangthai", "status"):
+            if self.dang_chay:
+                dong = ["<b>🟢 Đang chạy</b>", self._tin_tien_do().split("\n", 1)[-1]]
+            else:
+                dong = ["<b>⚪ Đang rảnh</b>", "Không có việc nào đang chạy."]
+                cu = getattr(self, "_lan_cuoi", None) or {}
+                if cu:
+                    dong.append("")
+                    dong.append("Lượt gần nhất: %d/%d (OK %d · Lỗi %d)"
+                                % (cu.get("ok", 0) + cu.get("loi", 0) + cu.get("dung", 0),
+                                   cu.get("tong", 0), cu.get("ok", 0), cu.get("loi", 0)))
+            dong.append("")
+            dong.append("Nhóm nhận báo cáo: <b>%d</b> · mỗi <b>%s</b> phút"
+                        % (len(self._ds_chat_nhan()), self.cfg.get("tele_moi_phut", 30)))
+            text = "\n".join(dong)
+        else:
+            dong = ["<b>🤖 LightVisual v%s</b>" % APP_VERSION, "",
+                    "<b>Các lệnh</b>",
+                    "/baocao — báo cáo tiến độ ngay",
+                    "/trangthai — đang chạy hay đang rảnh",
+                    "/giup — hướng dẫn này"]
+            if lenh not in ("giup", "help", "start"):
+                dong.insert(1, "Không rõ lệnh <code>/%s</code>.\n" % tele.esc(lenh))
+            text = "\n".join(dong)
+        self._log("Telegram: nhận lệnh /%s từ %s." % (lenh, ten or chat_id))
+
+        def chay():
+            ok, loi = tele.gui(tok, chat_id, text)
+            if not ok:
+                self.ui_q.put(("log", "Telegram: không trả lời được /%s — %s" % (lenh, loi)))
         threading.Thread(target=chay, daemon=True).start()
 
     def _tin_tien_do(self):
@@ -1716,6 +1758,8 @@ class App(tk.Tk):
                     self._hien_kq_tele_thu(*gt)
                 elif loai == "tele_lenh":
                     self._tra_loi_baocao(*gt)
+                elif loai == "tele_lenh_khac":
+                    self._tra_loi_lenh_khac(*gt)
                 elif loai == "dem_tc":
                     self._cap_nhat_dem_tham_chieu()
                 elif loai == "key_chet":
