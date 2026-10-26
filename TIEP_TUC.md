@@ -131,7 +131,7 @@ Test cũ chỉ đếm **tổng số MP4** nên không bắt được.
 lấy từ toàn bộ nội dung (hash). Đừng assert test bằng tổng số file — phải assert **file nào nằm
 trong thư mục nào**.
 
-## 5d. Báo cáo tiến độ lên Telegram (v1.0.13)
+## 5d. Báo cáo tiến độ lên Telegram (v1.0.14)
 Nút **📣 Telegram** ở góc phải trên, cạnh `API key`. Mở hộp thoại — **chỉ 2 ô nhập, không quét nhóm**:
 
 1. **Bật báo cáo Telegram** — mặc định TẮT.
@@ -168,7 +168,16 @@ Ghi chú kỹ thuật:
 - **`getUpdates` chỉ được chạy 1 nơi cho mỗi token.** Tool chỉ nghe lệnh bằng token anh dán
   vào hộp thoại; **không** tự dùng token trong `.env` của Hermes — nếu dùng, bot Hermes và tool
   sẽ tranh nhau và trả `409 Conflict`. Gặp 409 → tool tự dừng + nhắc tạo bot riêng.
+- **Menu lệnh:** tool tự gọi `setMyCommands` (scope `all_group_chats`) lúc bật nghe lệnh →
+  gõ `/` trong nhóm là hiện sẵn 3 lệnh để bấm, không phải nhớ cú pháp:
+  `/baocao` (báo cáo ngay), `/trangthai` (đang chạy/rảnh), `/giup` (hướng dẫn).
+  Lệnh gắn `@bot_khac` thì bot này bỏ qua → 1 nhóm nhiều bot không tranh nhau.
+  Xem lại menu: `tele.lay_lenh(token)`; đăng ký lại: `tele.dat_lenh(token)`.
 - Group privacy ON thì chỉ thấy lệnh dạng `/baocao@<username_bot>` — tool xử lý cả 2 dạng.
+- **409 Conflict** → tool **thử lại 5 lần** (chờ 3/6/9/12s), chỉ bỏ khi tranh chấp liên tục;
+  trước v1.0.13 gặp 1 lần là tắt luồng vĩnh viễn → bot im lặng dù app vẫn mở.
+- **Nhiều bot / nhiều máy:** mỗi máy 1 token riêng + cùng ID nhóm = OK, không 409.
+  Mỗi token chỉ 1 chương trình `getUpdates`; 2 tool cùng token (dù khác máy) → 409.
 - `tele_offset` (update_id cuối) lưu trong `config.json` để mở lại app không xử lý lặp lệnh cũ.
 - Test: `tests/test_tele_nhom.py` (34) + `tests/test_tele_hop.py` (24: hộp thoại token + ID nhóm,
   đọc link/@kenh/ID dương, ID sai không lưu, `/baocao` trả lời).
