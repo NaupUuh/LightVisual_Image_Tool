@@ -1665,7 +1665,7 @@ class App(tk.Tk):
         self._dung_baocao()
         if not self.cfg.get("tele_bat"):
             return
-        tok = (self.cfg.get("tele_token") or "").strip() or tele.lay_token("")
+        tok = (self.cfg.get("tele_token") or "").strip()
         ds = self._ds_chat_nhan()
         if not tok or not ds:
             self._log("Telegram: bật nhưng thiếu token/nhóm — không gửi.")
@@ -1727,7 +1727,10 @@ class App(tk.Tk):
             dong.append("")
             dong.append("<i>Bấm CHẠY trong tool để bắt đầu, rồi gõ /baocao bất cứ lúc nào.</i>")
             text = "\n".join(dong)
-        tok = (self.cfg.get("tele_token") or "").strip() or tele.lay_token("")
+        tok = (self.cfg.get("tele_token") or "").strip()
+        if not tok:
+            self._log("Telegram: chưa có bot token — không trả lời /baocao.")
+            return
         self._log("Telegram: nhận lệnh /baocao từ %s — gửi báo cáo." % (ten or chat_id))
 
         def chay():

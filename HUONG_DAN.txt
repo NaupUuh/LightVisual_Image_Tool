@@ -110,6 +110,10 @@ Token bị che khi ghi log; mất mạng chỉ ghi log, không ảnh hưởng l�
 Nhóm chỉ hiện trong danh sách khi bot **đã được add vào nhóm** và có ít nhất 1 tin nhắn
 (hoặc bot vừa được thêm). Group privacy ON thì dùng `/baocao@<username_bot>`.
 
+**Lưu ý:** mỗi bot token chỉ có 1 nơi được `getUpdates` một lúc. Nếu bấm Cập nhật mà báo
+`409 Conflict` → token đó đang bị chương trình khác đọc (vd bot Hermes). Tạo bot riêng
+cho tool bằng **@BotFather** (`/newbot`) rồi dán token mới — đừng dùng token của bot khác.
+
 ## 7. Lỗi thường gặp
 
 | Hiện tượng | Nguyên nhân / cách xử lý |

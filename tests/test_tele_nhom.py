@@ -66,6 +66,10 @@ class H(BaseHTTPRequestHandler):
             return
 
         if method == "getUpdates":
+            if DEM.get("loi_409"):
+                self._tra(409, {"ok": False, "description":
+                                "Conflict: terminated by other getUpdates request"})
+                return
             off = int(ts.get("offset") or 0)
             ra = [u for u in DEM["updates"] if int(u.get("update_id", 0)) >= off]
             self._tra(200, {"ok": True, "result": ra})
@@ -188,6 +192,21 @@ def main():
     time.sleep(1.6)
     td2.dung()
     kiem("TheoDoi bỏ qua chat riêng", len(da_nhan2) == 0, str(da_nhan2))
+
+    # 409 Conflict (token đang bị nơi khác getUpdates) -> tự dừng, không spam
+    DEM["updates"] = []
+    DEM["loi_409"] = True
+    logs = []
+    td3 = tele.TheoDoi(TOKEN, khi_lenh=lambda *a: None, log=lambda s: logs.append(s),
+                       timeout=5)
+    td3.bat_dau()
+    t0 = time.time()
+    while td3.dang_chay() and time.time() - t0 < 8:
+        time.sleep(0.1)
+    DEM["loi_409"] = False
+    kiem("TheoDoi gặp 409 -> tự dừng", td3.dang_chay() is False)
+    kiem("TheoDoi 409 -> log hướng dẫn tạo bot riêng",
+         any("409" in s for s in logs), str(logs))
 
     # ---- BaoCao nhiều nhóm
     DEM["tin"] = []

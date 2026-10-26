@@ -439,6 +439,13 @@ class TheoDoi(object):
             if not ok:
                 self.loi_cuoi = kq
                 dem_loi += 1
+                if "409" in str(kq) or "Conflict" in str(kq):
+                    # token này đang bị nơi khác getUpdates (vd bot Hermes) —
+                    # dừng ngay, không tranh chấp làm chết cả 2 bên
+                    self.log("Tele: token đang được nơi khác dùng để nghe lệnh (409). "
+                             "Hãy tạo bot riêng cho tool bằng @BotFather rồi dán token mới.")
+                    self._stop.set()
+                    break
                 if dem_loi == 1:
                     self.log("Tele: không đọc được lệnh trong nhóm — %s" % kq)
                 if dem_loi >= 3:
