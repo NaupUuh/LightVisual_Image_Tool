@@ -1,4 +1,4 @@
-# LightVisual Image Tool — v1.0.0
+# LightVisual Image Tool — v1.0.8
 
 Tool Tkinter tạo ảnh hàng loạt qua API **lightvisual.studio** (không qua web, không cần mở trình duyệt).
 Chạy được trên **Python 3.9+**, không cần `pip install` gì (core dùng `urllib`).
@@ -88,6 +88,20 @@ Folder gốc\
 - Folder nào **thiếu `prompt.txt`** thì lấy prompt theo thứ tự ở ô "PROMPT VIDEO"
   (nhãn sẽ báo `· N folder thiếu prompt.txt`).
 - Nút **"Ghi prompt.txt"**: ghi danh sách prompt ở ô PROMPT VIDEO vào từng folder con (bỏ qua folder đã có file).
+
+## 6b. Báo cáo tiến độ lên Telegram
+
+Nút **📣 Telegram** (góc phải trên):
+- **Bật báo cáo Telegram** — mặc định TẮT.
+- **Bot token** — để trống thì lấy `TELEGRAM_BOT_TOKEN` trong `.env` của Hermes.
+- **Chat ID** — ID chat nhận tin.
+- **Gửi tiến độ mỗi (phút)** — 1…60, mặc định 5.
+- **Gửi thử** để kiểm tra ngay, **Lưu** để ghi vào `config.json`.
+
+Tool gửi 3 tin: **BẮT ĐẦU** (loại việc, model, tổng việc, số luồng, thư mục ra),
+**TIẾN ĐỘ** (mỗi N phút: thanh tiến độ, OK/Lỗi/Dừng, đã chạy, còn khoảng bao lâu),
+**KẾT THÚC** (tổng kết + đường dẫn thư mục ra). Bấm **DỪNG** cũng gửi 1 tin báo.
+Token bị che khi ghi log; mất mạng chỉ ghi log, không ảnh hưởng lượt chạy.
 
 ## 7. Lỗi thường gặp
 

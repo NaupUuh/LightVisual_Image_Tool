@@ -19,13 +19,14 @@ import traceback
 import webbrowser
 from tkinter import filedialog, messagebox, ttk
 
-APP_VERSION = "1.0.7"
+APP_VERSION = "1.0.8"
 APP_TEN = "LightVisual Image Tool"
 
 THU_MUC_GOC = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, THU_MUC_GOC)
 
 from core import api  # noqa: E402
+from core import tele  # noqa: E402
 
 try:
     from PIL import Image, ImageTk
@@ -58,6 +59,11 @@ DEFAULTS = {
     "video_mc": "",
     "video_tham_chieu": "",
     "video_xoa_tham_chieu": True,
+    # báo cáo tiến độ lên Telegram
+    "tele_bat": False,
+    "tele_token": "",
+    "tele_chat_id": "",
+    "tele_moi_phut": 5,
 }
 
 NEN = "#12141a"
@@ -122,6 +128,7 @@ class App(tk.Tk):
         self._dang_lam = 0         # số việc luồng đang thực sự chạy
         self._dem_lock = threading.Lock()
         self._tt_file = os.path.join(THU_MUC_GOC, "tiep_tuc.json")
+        self.bc = None             # đối tượng báo cáo Telegram (core/tele.py)
 
         self.title("%s v%s" % (APP_TEN, APP_VERSION))
         self.geometry("1240x820")
@@ -208,6 +215,8 @@ class App(tk.Tk):
         self.lbl_plan = ttk.Label(top, text="", style="Mo.TLabel")
         self.lbl_plan.pack(side="right")
         ttk.Button(top, text="API key", command=self._doi_key).pack(side="right", padx=(0, 10))
+        self.btn_tele = ttk.Button(top, text="📣 Telegram", command=self._hop_tele)
+        self.btn_tele.pack(side="right", padx=(0, 8))
         self.upd_btn = ttk.Button(top, text="⬆ Cập nhật", command=self._check_update)
         self.upd_btn.pack(side="right", padx=(0, 8))
         ttk.Button(top, text="Tài liệu API", command=lambda: webbrowser.open(
@@ -236,6 +245,7 @@ class App(tk.Tk):
 
         self._cap_nhat_plan_label()
         self._cap_nhat_uoc_tinh()
+        self._cap_nhat_tele_label()
 
     # ------------------------------------------------ tab 1
     def _dung_tab_tao(self):
@@ -1348,6 +1358,164 @@ class App(tk.Tk):
             self._cap_nhat_uoc_tinh()
         self._log("Kiểm tra key: %d OK | %d lỗi" % (len(ok), len(loi)))
 
+    # ------------------------------------------------ báo cáo Telegram
+    def _hop_tele(self):
+        w = tk.Toplevel(self)
+        w.title("Báo cáo tiến độ lên Telegram")
+        w.configure(bg=NEN)
+        w.geometry("640x430")
+        w.transient(self)
+        w.grab_set()
+
+        ttk.Label(w, text="Tool tự gửi tin nhắn khi bắt đầu, mỗi vài phút một lần, "
+                          "và khi xong/lỗi. Để trống ô token thì tool lấy "
+                          "TELEGRAM_BOT_TOKEN trong .env của Hermes.",
+                  style="TLabel", wraplength=600, justify="left").grid(
+            row=0, column=0, columnspan=2, sticky="w", padx=16, pady=(14, 8))
+
+        var_bat = tk.BooleanVar(value=bool(self.cfg.get("tele_bat")))
+        ttk.Checkbutton(w, text="Bật báo cáo Telegram", variable=var_bat).grid(
+            row=1, column=0, columnspan=2, sticky="w", padx=16, pady=(0, 8))
+
+        ttk.Label(w, text="Bot token").grid(row=2, column=0, sticky="w", padx=16, pady=5)
+        e_tok = ttk.Entry(w, width=52)
+        e_tok.grid(row=2, column=1, sticky="ew", padx=(0, 16), pady=5)
+
+        ttk.Label(w, text="Chat ID").grid(row=3, column=0, sticky="w", padx=16, pady=5)
+        e_chat = ttk.Entry(w, width=52)
+        e_chat.grid(row=3, column=1, sticky="ew", padx=(0, 16), pady=5)
+
+        ttk.Label(w, text="Gửi tiến độ mỗi (phút)").grid(row=4, column=0, sticky="w",
+                                                        padx=16, pady=5)
+        sp_phut = tk.Spinbox(w, from_=1, to=60, width=6, bg=NEN2, fg=CHU,
+                             buttonbackground=NEN2, relief="flat", justify="center")
+        sp_phut.grid(row=4, column=1, sticky="w", pady=5)
+        sp_phut.delete(0, "end")
+        sp_phut.insert(0, str(int(self.cfg.get("tele_moi_phut") or 5)))
+
+        tok_hien = (self.cfg.get("tele_token") or "").strip()
+        if tok_hien:
+            e_tok.insert(0, tok_hien)
+        e_chat.insert(0, (self.cfg.get("tele_chat_id") or "").strip())
+
+        lbl = ttk.Label(w, text="", style="Mo.TLabel", wraplength=600, justify="left")
+        lbl.grid(row=5, column=0, columnspan=2, sticky="w", padx=16, pady=(8, 0))
+
+        def doc():
+            tok = e_tok.get().strip()
+            chat = e_chat.get().strip()
+            if not tok:
+                tok = tele.lay_token("")
+            try:
+                phut = max(1, min(60, int(sp_phut.get() or 5)))
+            except Exception:
+                phut = 5
+            return tok, chat, phut
+
+        def luu():
+            tok, chat, phut = doc()
+            self.cfg["tele_bat"] = bool(var_bat.get())
+            self.cfg["tele_token"] = tok
+            self.cfg["tele_chat_id"] = chat
+            self.cfg["tele_moi_phut"] = phut
+            luu_cfg(self.cfg)
+            self._dung_baocao()
+            self._cap_nhat_tele_label()
+            w.destroy()
+            self._log("Telegram: đã lưu (bật=%s, chat=%s, mỗi %d phút)."
+                      % ("có" if self.cfg["tele_bat"] else "không", chat or "—", phut))
+
+        def thu():
+            tok, chat, _phut = doc()
+            if not tok or not chat:
+                lbl.configure(text="Thiếu bot token hoặc chat ID.", foreground=DO)
+                return
+            lbl.configure(text="Đang gửi thử…", foreground=CHU_MO)
+            w.update_idletasks()
+
+            def chay():
+                ok, loi = tele.gui(tok, chat, "<b>LightVisual Image Tool v%s</b>\n"
+                                              "Kết nối Telegram OK." % APP_VERSION)
+                self.ui_q.put(("tele_thu", (ok, loi, chat)))
+            threading.Thread(target=chay, daemon=True).start()
+
+        h = ttk.Frame(w)
+        h.grid(row=6, column=0, columnspan=2, sticky="ew", padx=16, pady=14)
+        ttk.Button(h, text="Gửi thử", command=thu).pack(side="left")
+        ttk.Button(h, text="Lưu", command=luu).pack(side="right")
+        ttk.Button(h, text="Huỷ", command=w.destroy).pack(side="right", padx=(0, 8))
+        w.columnconfigure(1, weight=1)
+        self._hop_tele_ctl = (lbl,)
+
+    def _hien_kq_tele_thu(self, ok, loi, chat):
+        hop = getattr(self, "_hop_tele_ctl", None)
+        if hop:
+            lbl = hop[0]
+            try:
+                if ok:
+                    lbl.configure(text="Đã gửi tới chat %s — mở Telegram xem." % chat,
+                                  foreground=XANH)
+                else:
+                    lbl.configure(text="Gửi lỗi: %s" % loi, foreground=DO)
+            except tk.TclError:
+                pass
+        self._log("Telegram gửi thử: %s" % ("OK" if ok else "LỖI — %s" % loi))
+
+    def _cap_nhat_tele_label(self):
+        try:
+            if self.cfg.get("tele_bat"):
+                self.btn_tele.configure(text="📣 Telegram: BẬT")
+            else:
+                self.btn_tele.configure(text="📣 Telegram")
+        except Exception:
+            pass
+
+    def _dung_baocao(self):
+        if self.bc:
+            try:
+                self.bc.dung()
+            except Exception:
+                pass
+            self.bc = None
+
+    def _bat_baocao(self):
+        """Tạo đối tượng báo cáo cho lượt chạy mới (nếu đang bật)."""
+        self._dung_baocao()
+        if not self.cfg.get("tele_bat"):
+            return
+        tok = (self.cfg.get("tele_token") or "").strip() or tele.lay_token("")
+        chat = (self.cfg.get("tele_chat_id") or "").strip()
+        if not tok or not chat:
+            self._log("Telegram: bật nhưng thiếu token/chat ID — không gửi.")
+            return
+        try:
+            phut = int(self.cfg.get("tele_moi_phut") or 5)
+        except Exception:
+            phut = 5
+        self.bc = tele.BaoCao(tok, chat, moi_giay=phut * 60, log=self._log)
+        self.bc.bat_dau_worker()
+
+    def _tin_tien_do(self):
+        """Soạn nội dung tin tiến độ hiện tại."""
+        with self._dem_lock:
+            d = dict(self._dem)
+        loai = (self._lan_chay or {}).get("loai") or "anh"
+        giay = time.time() - self._t0 if self._t0 else 0
+        xong = d["ok"] + d["loi"] + d.get("dung", 0)
+        con = max(0, d["tong"] - xong)
+        tb = (giay / xong) if xong else 0
+        con_lai = tb * con
+        dong = [
+            "<b>LightVisual — đang chạy</b>",
+            "%s  %d/%d" % (tele.thanh_tien_do(d), xong, d["tong"]),
+            "✅ OK %d   ❌ Lỗi %d   ⏸ Dừng %d" % (d["ok"], d["loi"], d.get("dung", 0)),
+            "⏱ Đã chạy %s · còn khoảng %s" % (tele.dinh_dang_giay(giay),
+                                              tele.dinh_dang_giay(con_lai) if con else "0s"),
+        ]
+        if xong:
+            dong.append("⚡ %.1fs/việc" % tb)
+        return "\n".join(dong)
+
     # ------------------------------------------------ log / ui queue
     def _log(self, s):
         self.txt_log.configure(state="normal")
@@ -1371,6 +1539,8 @@ class App(tk.Tk):
                     self._ket_thuc(*gt)
                 elif loai == "kiem_key":
                     self._hien_kq_kiem_key(gt)
+                elif loai == "tele_thu":
+                    self._hien_kq_tele_thu(*gt)
                 elif loai == "dem_tc":
                     self._cap_nhat_dem_tham_chieu()
                 elif loai == "key_chet":
@@ -1402,6 +1572,9 @@ class App(tk.Tk):
                  (dem["ok"] + dem["loi"] + dem.get("dung", 0), dem["tong"],
                   dem["ok"], dem["loi"], dem.get("dung", 0),
                   time.time() - self._t0))
+        # đẩy tin tiến độ vào hàng đợi; core/tele.py tự chặn tần suất
+        if self.bc and self.bc.enabled:
+            self.bc.tien_do(self._tin_tien_do())
 
     def _dem_dung(self):
         with self._dem_lock:
@@ -2036,6 +2209,23 @@ class App(tk.Tk):
                   (len(viec), len(da_xong), len(keys), len(keys)))
         self._cap_nhat_dem(dict(self._dem))
 
+        # báo cáo Telegram
+        self._bat_baocao()
+        if self.bc and self.bc.enabled:
+            ten_loai = "tạo ảnh" if loai == "anh" else "ảnh → video"
+            mo_ta = api.nhan_model(cau_hinh.get("model", "")) if loai == "anh" \
+                else api.nhan_video(cau_hinh.get("model", ""))
+            self.bc.bat_dau(
+                "<b>LightVisual v%s — bắt đầu</b>\n"
+                "Loại: %s · Model: %s\n"
+                "Tổng: <b>%d</b> việc (%d đã xong trước đó)\n"
+                "Luồng: %d (mỗi API key 1 luồng)\n"
+                "Thư mục ra: <code>%s</code>\n"
+                "Sẽ báo lại mỗi %d phút."
+                % (APP_VERSION, ten_loai, mo_ta, len(viec), len(da_xong),
+                   len(keys), tele.esc(cau_hinh.get("thu_muc", "")),
+                   int(self.cfg.get("tele_moi_phut") or 5)))
+
     def _ket_thuc_viec(self):
         with self._dem_lock:
             d = dict(self._dem)
@@ -2052,6 +2242,16 @@ class App(tk.Tk):
         self._log("Đang dừng… các luồng sẽ nhả việc đang chạy. "
                   "Bấm 'Tiếp tục' để chạy tiếp phần còn lại.")
         self.btn_dung.configure(state="disabled")
+        if self.bc and self.bc.enabled:
+            with self._dem_lock:
+                d = dict(self._dem)
+            self.bc.bat_dau(
+                "<b>LightVisual — đã bấm DỪNG</b>\n"
+                "%s  %d/%d\n"
+                "✅ OK %d   ❌ Lỗi %d\n"
+                "Các luồng đang nhả việc — sẽ có tin kết thúc ngay sau đây."
+                % (tele.thanh_tien_do(d), d["ok"] + d["loi"] + d.get("dung", 0),
+                   d["tong"], d["ok"], d["loi"]))
 
     def _bam_tiep_tuc(self):
         """Chạy tiếp phần chưa xong của lượt trước (không làm lại việc đã OK)."""
@@ -2120,6 +2320,23 @@ class App(tk.Tk):
         self._luu_tt()
         self._cap_nhat_nut_tiep()
         self._cap_nhat_plan_label()
+        # báo cáo kết thúc
+        if self.bc and self.bc.enabled:
+            tb = (giay / max(1, d["ok"] + d["loi"] + d.get("dung", 0)))
+            dong = [
+                "<b>LightVisual v%s — KẾT THÚC</b>" % APP_VERSION,
+                "%s  %d/%d" % (tele.thanh_tien_do(d),
+                               d["ok"] + d["loi"] + d.get("dung", 0), d["tong"]),
+                "✅ OK %d   ❌ Lỗi %d   ⏸ Dừng %d" % (d["ok"], d["loi"], d.get("dung", 0)),
+                "⏱ Tổng %s · %.1fs/việc" % (tele.dinh_dang_giay(giay), tb),
+            ]
+            if con:
+                dong.append("Còn <b>%d</b> việc — bấm “Tiếp tục” để chạy tiếp." % con)
+            if d["loi"]:
+                dong.append("\n<i>Mở tab “Kết quả & nhật ký” để xem lỗi từng dòng.</i>")
+            dong.append("📁 <code>%s</code>" % tele.esc((ch or {}).get("thu_muc", "")))
+            self.bc.ket_thuc("\n".join(dong))
+            self._dung_baocao()
 
     # ------------------------------------------------ cập nhật từ GitHub
 
@@ -2224,6 +2441,7 @@ class App(tk.Tk):
                 self.after_cancel(self._aid)
         except Exception:
             pass
+        self._dung_baocao()
         self.destroy()
 
 

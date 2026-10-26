@@ -1,6 +1,6 @@
 # TIẾP TỤC — LightVisual Image Tool
 
-Cập nhật: 2026-10-25 · **v1.0.7** · trạng thái: chạy thật OK với key thật (gói Grok Vô Hạn 1 ngày)
+Cập nhật: 2026-10-26 · **v1.0.8** · trạng thái: chạy thật OK với key thật (gói Grok Vô Hạn 1 ngày)
 
 ## 1. Tool này làm gì
 Tạo ảnh hàng loạt qua API lightvisual.studio (`POST /v1/images/generations`),
@@ -35,6 +35,8 @@ Gói **Grok Vô Hạn** → ảnh Grok tính **0đ**, kể cả ảnh gửi kèm
 | `tests/test_mock.py` | **19/0 PASS** |
 | `tests/test_gui.py` | **90/0 PASS** |
 | `tests/test_key_dialog.py` | **7/0 PASS** |
+| `tests/test_tele.py` | **26/0 PASS** (máy chủ Telegram giả, 0 tin thật) |
+| `tests/test_tele_gui.py` | **9/0 PASS** (GUI thật → bắt đầu/tiến độ/kết thúc đều bắn tin) |
 | `tests/_test_update_btn.py` | **PASS** (nút Cập nhật hiện, bấm chạy được) |
 | `tests/_do_tab_tc.py` | **PASS** (tab video không cắt khung tham chiếu ở 1040x640) |
 | `py_compile` main.py + core/api.py + updater.py | OK (3.14.2 + 3.13) |
@@ -128,6 +130,27 @@ Test cũ chỉ đếm **tổng số MP4** nên không bắt được.
 **Điều tránh**: đừng cắt tên thư mục theo **số ký tự** của prompt; luôn có thành phần phân biệt
 lấy từ toàn bộ nội dung (hash). Đừng assert test bằng tổng số file — phải assert **file nào nằm
 trong thư mục nào**.
+
+## 5d. Báo cáo tiến độ lên Telegram (v1.0.8)
+Nút **📣 Telegram** ở góc phải trên, cạnh `API key`. Mở hộp thoại:
+- **Bật báo cáo Telegram** — mặc định TẮT.
+- **Bot token** — để trống thì tool tự đọc `TELEGRAM_BOT_TOKEN` trong `.env` của Hermes.
+- **Chat ID** — chat nhận tin (user: `8446833069`).
+- **Gửi tiến độ mỗi (phút)** — 1…60, mặc định 5.
+- Nút **Gửi thử** kiểm tra token/chat ngay, **Lưu** ghi vào `config.json`.
+
+3 loại tin được gửi:
+1. **BẮT ĐẦU** — loại việc, model, tổng số việc (kèm số đã xong trước đó), số luồng, thư mục ra.
+2. **TIẾN ĐỘ** — mỗi N phút: thanh tiến độ, `OK/Lỗi/Dừng`, đã chạy, còn khoảng bao lâu, giây/việc.
+3. **KẾT THÚC** — tổng kết + đường dẫn thư mục ra; nếu còn việc thì nhắc bấm "Tiếp tục".
+   Bấm **DỪNG** cũng gửi 1 tin báo ngay.
+
+Ghi chú kỹ thuật:
+- `core/tele.py` — thuần stdlib (`urllib`), không cần pip; chạy được Python 3.9+.
+- Luồng gửi là **thread riêng có hàng đợi**, nên gọi mạng không làm treo GUI; khi app đóng vẫn gửi nốt tin kết thúc.
+- **Token luôn bị che** trong log (`123456789:…`), không ghi vào log hay file.
+- Mạng lỗi / token sai → chỉ ghi log, **không ảnh hưởng lượt chạy**.
+- Token lưu trong `config.json` (đã nằm trong `.gitignore`).
 
 ## 6. Việc còn lại
 1. Gói hiện tại chỉ **1 ngày / 1 luồng** → muốn nhiều luồng song song thật thì nâng gói hoặc thêm nhiều key.

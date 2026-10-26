@@ -5,3 +5,5 @@ tests/_tmp_test/
 tests/_tmp_do/
 __pycache__/
 *.pyc
+Image/
+_sang.py
