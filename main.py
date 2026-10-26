@@ -19,7 +19,7 @@ import traceback
 import webbrowser
 from tkinter import filedialog, messagebox, ttk
 
-APP_VERSION = "1.0.15"
+APP_VERSION = "1.0.16"
 APP_TEN = "LightVisual Image Tool"
 
 THU_MUC_GOC = os.path.dirname(os.path.abspath(__file__))
@@ -65,6 +65,7 @@ DEFAULTS = {
     "tele_chat_id": "",
     "tele_chat_ids": [],
     "tele_nhom_ten": {},
+    "tele_ten": "",
     "tele_nghe": True,
     "tele_offset": 0,
     "tele_moi_phut": 30,
@@ -153,6 +154,8 @@ class App(tk.Tk):
         if self.cfg.get("tele_bat") and self.cfg.get("tele_nghe", True) \
                 and (self.cfg.get("tele_chat_ids") or self.cfg.get("tele_chat_id")):
             self.after(600, self._bat_theo_doi)
+        # canh luồng nghe: nếu chết thì tự bật lại (30s/lần)
+        self.after(30000, self._giam_sat_nghe)
 
     # ------------------------------------------------------------ style
     def _dung_style(self):
@@ -1383,8 +1386,8 @@ class App(tk.Tk):
         w = tk.Toplevel(self)
         w.title("Báo cáo tiến độ lên Telegram")
         w.configure(bg=NEN)
-        w.geometry("700x430")
-        w.minsize(640, 400)
+        w.geometry("700x530")
+        w.minsize(640, 500)
         w.transient(self)
         w.grab_set()
 
@@ -1412,8 +1415,25 @@ class App(tk.Tk):
                   style="Mo.TLabel", wraplength=660, justify="left").grid(
             row=4, column=0, columnspan=2, sticky="w", padx=16, pady=(0, 8))
 
+        # Nhóm có nhiều bot: mỗi máy đặt 1 tên riêng -> tin báo cáo có nhãn,
+        # nhìn là biết của máy/bot nào.
+        ttk.Label(w, text="Tên gọi nhớ").grid(row=5, column=0, sticky="w",
+                                              padx=16, pady=5)
+        e_ten = ttk.Entry(w, width=52)
+        e_ten.grid(row=5, column=1, sticky="ew", padx=(0, 16), pady=5)
+        ttk.Label(w, text="Để trống = dùng @username của bot. Nhóm nhiều bot thì đặt "
+                          "tên riêng (vd: Máy A – ảnh) để phân biệt tin báo cáo.",
+                  style="Mo.TLabel", wraplength=660, justify="left").grid(
+            row=6, column=0, columnspan=2, sticky="w", padx=16, pady=(0, 6))
+
+        # Lệnh đầy đủ để copy (bot bật privacy mode thì phải có @username)
+        lbl_lenh = ttk.Label(w, text="", style="Mo.TLabel", wraplength=660,
+                             justify="left")
+        lbl_lenh.grid(row=7, column=0, columnspan=2, sticky="w", padx=16,
+                      pady=(0, 4))
+
         f = ttk.Frame(w)
-        f.grid(row=5, column=0, columnspan=2, sticky="ew", padx=16, pady=(4, 0))
+        f.grid(row=8, column=0, columnspan=2, sticky="ew", padx=16, pady=(4, 0))
         ttk.Label(f, text="Gửi tiến độ mỗi (phút)").pack(side="left")
         sp_phut = tk.Spinbox(f, from_=1, to=240, width=6, bg=NEN2, fg=CHU,
                              buttonbackground=NEN2, relief="flat", justify="center")
@@ -1428,10 +1448,10 @@ class App(tk.Tk):
                         variable=var_nghe).pack(side="left")
 
         lbl = ttk.Label(w, text="", style="Mo.TLabel", wraplength=660, justify="left")
-        lbl.grid(row=6, column=0, columnspan=2, sticky="w", padx=16, pady=(8, 0))
+        lbl.grid(row=9, column=0, columnspan=2, sticky="w", padx=16, pady=(8, 0))
 
         h = ttk.Frame(w)
-        h.grid(row=7, column=0, columnspan=2, sticky="ew", padx=16, pady=14)
+        h.grid(row=10, column=0, columnspan=2, sticky="ew", padx=16, pady=14)
         ttk.Button(h, text="Gửi thử", command=lambda: thu()).pack(side="left")
         ttk.Button(h, text="Lưu", command=lambda: luu()).pack(side="right")
         ttk.Button(h, text="Huỷ", command=w.destroy).pack(side="right", padx=(0, 8))
@@ -1443,6 +1463,21 @@ class App(tk.Tk):
         id_hien = ", ".join(self._ds_chat_nhan())
         if id_hien:
             e_id.insert(0, id_hien)
+        e_ten.insert(0, str(self.cfg.get("tele_ten") or ""))
+
+        def cap_nhat_lenh(*_a):
+            u = self._ten_bot_that()
+            if u:
+                lbl_lenh.configure(
+                    text="Lệnh dùng trong nhóm:  /baocao@%s   ·   /trangthai@%s"
+                         % (u, u), foreground=XANH)
+            else:
+                lbl_lenh.configure(
+                    text="Dán bot token rồi Lưu để hiện lệnh đầy đủ dạng "
+                         "/baocao@<tên_bot>.", foreground=CHU_MO)
+
+        e_tok.bind("<FocusOut>", cap_nhat_lenh)
+        w.after(400, cap_nhat_lenh)
 
         def lay_tok():
             # chỉ dùng token anh dán vào — KHÔNG rơi về token trong .env Hermes
@@ -1486,6 +1521,7 @@ class App(tk.Tk):
                                     "chưa gửi báo cáo tự động.", foreground=VANG)
             self.cfg["tele_bat"] = bool(var_bat.get())
             self.cfg["tele_token"] = tok
+            self.cfg["tele_ten"] = (e_ten.get() or "").strip()
             self.cfg["tele_nghe"] = bool(var_nghe.get())
             self.cfg["tele_moi_phut"] = phut
             self.cfg["tele_chat_ids"] = ds
@@ -1593,8 +1629,53 @@ class App(tk.Tk):
         except Exception:
             phut = 30
         self.bc = tele.BaoCao(tok, "", moi_giay=phut * 60, chat_ids=ds,
-                              log=lambda s: self.ui_q.put(("log", s)))
+                              log=lambda s: self.ui_q.put(("log", s)),
+                              nhan=self._nhan_bot())
         self.bc.bat_dau_worker()
+
+    # -- nhãn bot (1 nhóm nhiều bot vẫn phân biệt được tin của bot nào)
+    def _nhan_bot(self):
+        ten = str(self.cfg.get("tele_ten") or "").strip()
+        if ten:
+            return ten
+        u = str(getattr(self.td, "bot_username", "") or "").strip()
+        return ("@" + u) if u else ""
+
+    def _ten_bot_that(self):
+        """Username thật của bot (để hiện /baocao@<bot> cho anh copy)."""
+        u = str(getattr(self.td, "bot_username", "") or "").strip()
+        if u:
+            return u
+        tok = (self.cfg.get("tele_token") or "").strip()
+        if not tok:
+            return ""
+        try:
+            ok, me = tele.get_me(tok)
+            if ok:
+                return str((me or {}).get("username") or "").strip()
+        except Exception:
+            pass
+        return ""
+
+    def _giam_sat_nghe(self):
+        """Tự bật lại luồng nghe nếu nó đã chết (mạng rớt, lỗi lạ).
+
+        Trước đây luồng nghe có thể chết mà không ai bật lại -> gõ /baocao
+        không có ai trả lời cho tới khi đóng/mở tool.
+        """
+        try:
+            if (self.cfg.get("tele_bat") and self.cfg.get("tele_nghe", True)
+                    and (self.cfg.get("tele_token") or "").strip()):
+                chet = (self.td is None) or (not self.td.dang_chay())
+                if chet and not getattr(self, "_dang_doi_bat", False):
+                    self._log("Telegram: luồng nghe lệnh đã dừng — tự bật lại.")
+                    self._bat_theo_doi()
+        except Exception:
+            pass
+        try:
+            self.after(30000, self._giam_sat_nghe)
+        except Exception:
+            pass
 
     # -- nghe lệnh /baocao
     def _bat_theo_doi(self):
@@ -1676,6 +1757,7 @@ class App(tk.Tk):
         if not tok:
             self._log("Telegram: chưa có bot token — không trả lời /baocao.")
             return
+        text = tele.nhan_tin(text, self._nhan_bot())
         self._log("Telegram: nhận lệnh /baocao từ %s — gửi báo cáo." % (ten or chat_id))
 
         def chay():
@@ -1712,6 +1794,7 @@ class App(tk.Tk):
             if lenh not in ("giup", "help", "start"):
                 dong.insert(1, "Không rõ lệnh <code>/%s</code>.\n" % tele.esc(lenh))
             text = "\n".join(dong)
+        text = tele.nhan_tin(text, self._nhan_bot())
         self._log("Telegram: nhận lệnh /%s từ %s." % (lenh, ten or chat_id))
 
         def chay():

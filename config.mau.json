@@ -28,5 +28,6 @@
   "tele_nhom_ten": {},
   "tele_nghe": true,
   "tele_offset": 0,
-  "tele_moi_phut": 30
+  "tele_moi_phut": 30,
+  "tele_ten": ""
 }

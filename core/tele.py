@@ -356,12 +356,26 @@ def lay_nhom(token, giay=10.0, offset=0, log=None):
     return dsac, off, ""
 
 
+def nhan_tin(text, nhan=""):
+    """Gan nhan bot len dau tin.
+
+    Trong 1 nhom co nhieu bot cung chay LightVisual, tin bao cao phai noi ro
+    cua bot nao. Khong co nhan -> tra nguyen van.
+    """
+    nhan = str(nhan or "").strip()
+    if not nhan:
+        return text
+    return "<b>🏷 %s</b>\n%s" % (esc(nhan), text)
+
+
 # ---------------------------------------------------------------- lớp báo cáo
 class BaoCao(object):
     """Hàng đợi gửi Telegram chạy nền, chặn tần suất, gửi được nhiều nhóm."""
 
-    def __init__(self, token="", chat_id="", moi_giay=300, log=None, chat_ids=None):
+    def __init__(self, token="", chat_id="", moi_giay=300, log=None, chat_ids=None,
+                 nhan=""):
         self.token = lay_token(token)
+        self.nhan = str(nhan or "").strip()
         ds = []
         for x in (chat_ids or []):
             x = str(x or "").strip()
@@ -448,6 +462,7 @@ class BaoCao(object):
                 with self._khoa:
                     if time.time() - self._lan_gui < self.moi_giay:
                         continue        # chưa tới nhịp -> bỏ tin này
+            text = nhan_tin(text, self.nhan)
             ok_het = True
             for cid in ds:
                 ok, loi = gui(self.token, cid, text)
@@ -484,6 +499,7 @@ class TheoDoi(object):
         self.offset = 0
         self.bot_username = ""
         self.loi_cuoi = ""
+        self.lan_cuoi_ok = 0.0      # moc lan cuoi getUpdates tra ve OK
         self._stop = threading.Event()
         self._t = None
 
@@ -543,26 +559,29 @@ class TheoDoi(object):
                 self.loi_cuoi = kq
                 dem_loi += 1
                 if "409" in str(kq) or "Conflict" in str(kq):
-                    # 409 = có request getUpdates khác đang giữ kết nối. Thường chỉ
-                    # là tranh chấp tạm thời (mở 2 cửa sổ tool, hoặc 1 lần gọi thử
-                    # từ ngoài) -> phải THỬ LẠI, không được tắt luồng vĩnh viễn.
-                    if dem_loi < 5:
-                        self.log("Tele: tranh chấp getUpdates (409) — thử lại lần %d/5."
-                                 % dem_loi)
-                        self._stop.wait(3.0 * dem_loi)
-                        continue
-                    self.log("Tele: token đang được chương trình khác nghe lệnh (409) "
-                             "5 lần liên tiếp. Hãy tắt chương trình đó, hoặc tạo bot "
-                             "riêng bằng @BotFather rồi dán token mới.")
-                    self._stop.set()
-                    break
+                    # 409 = có request getUpdates khác đang giữ kết nối (mở 2 cửa sổ
+                    # tool, hoặc 1 lần gọi thử từ ngoài). PHẢI thử lại MÃI, tuyệt đối
+                    # KHÔNG tắt luồng: tắt là bot im lặng vĩnh viễn cho tới khi anh
+                    # đóng/mở lại tool — đúng lỗi "ấn /baocao không chạy".
+                    cho = min(30.0, 3.0 * min(dem_loi, 10))
+                    if dem_loi == 1 or dem_loi % 5 == 0:
+                        self.log("Tele: tranh chấp getUpdates (409) lần %d — thử lại "
+                                 "sau %.0fs (luồng vẫn sống)." % (dem_loi, cho))
+                    self._stop.wait(cho)
+                    continue
                 if dem_loi == 1:
                     self.log("Tele: không đọc được lệnh trong nhóm — %s" % kq)
-                if dem_loi >= 3:
-                    break
-                self._stop.wait(3.0)
+                # lỗi khác (mạng rớt, DNS, timeout...): nghỉ rồi thử lại, không bỏ
+                if dem_loi >= 8:
+                    self.log("Tele: lỗi liên tục %d lần — nghỉ 30s rồi thử lại."
+                             % dem_loi)
+                    self._stop.wait(30.0)
+                    dem_loi = 0
+                    continue
+                self._stop.wait(min(30.0, 3.0 * dem_loi))
                 continue
             dem_loi = 0
+            self.lan_cuoi_ok = time.time()
             for up in (kq or []):
                 try:
                     self.offset = max(self.offset, int(up.get("update_id", 0)) + 1)
