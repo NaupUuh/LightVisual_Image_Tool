@@ -193,7 +193,8 @@ def main():
     td2.dung()
     kiem("TheoDoi bỏ qua chat riêng", len(da_nhan2) == 0, str(da_nhan2))
 
-    # 409 Conflict (token đang bị nơi khác getUpdates) -> tự dừng, không spam
+    # 409 Conflict: tranh chấp TẠM THỜI -> phải thử lại, KHÔNG tắt luồng.
+    # (bug cũ: gặp 1 lần 409 là chết luôn -> "bot không chạy")
     DEM["updates"] = []
     DEM["loi_409"] = True
     logs = []
@@ -201,12 +202,22 @@ def main():
                        timeout=5)
     td3.bat_dau()
     t0 = time.time()
-    while td3.dang_chay() and time.time() - t0 < 8:
+    while time.time() - t0 < 6:
         time.sleep(0.1)
+    kiem("TheoDoi gặp 409 -> vẫn sống để thử lại", td3.dang_chay() is True,
+         "dang_chay=%s logs=%s" % (td3.dang_chay(), logs))
+    kiem("TheoDoi 409 -> log nói đang thử lại",
+         any("thử lại" in s for s in logs), str(logs))
+    # hết tranh chấp -> phải tự phục hồi và bắt được lệnh trở lại
     DEM["loi_409"] = False
-    kiem("TheoDoi gặp 409 -> tự dừng", td3.dang_chay() is False)
-    kiem("TheoDoi 409 -> log hướng dẫn tạo bot riêng",
-         any("409" in s for s in logs), str(logs))
+    DEM["updates"] = [up(70, NHOM_A, "/baocao@test_bot")]
+    da_nhan3 = []
+    td3.khi_lenh = lambda c, t: da_nhan3.append((c, t))
+    t0 = time.time()
+    while time.time() - t0 < 25 and not da_nhan3:
+        time.sleep(0.1)
+    kiem("TheoDoi tự phục hồi sau 409", len(da_nhan3) == 1, str(da_nhan3))
+    td3.dung()
 
     # ---- BaoCao nhiều nhóm
     DEM["tin"] = []

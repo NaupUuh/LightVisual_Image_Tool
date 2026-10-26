@@ -1,4 +1,4 @@
 {
-  "version": "1.0.12",
-  "notes": "1.0.12: Them canh bao khi bot bat che do rieng tu (can_read_all_group_messages=False) - Telegram khong gui lenh /baocao tran vao nhom, phai go /baocao@<ten_bot> hoac tat privacy trong BotFather. Truoc day tool im lang khong bao gi nen tuong hong. Giu nguyen 1.0.11 (fix 409 khi bat/tat/bat lai)."
+  "version": "1.0.13",
+  "notes": "1.0.13: Sua loi 'bot khong chay' - gap 409 Conflict la tat luong nghe lenh VINH VIEN. Gio thu lai 5 lan voi backoff 3/6/9/12s; chi bo cuoc khi tranh chap lien tuc 5 lan. Them: _bat_theo_doi chay o luong nen nen nut Luu khong dung hinh khi phai cho long-poll cu nha ket noi."
 }

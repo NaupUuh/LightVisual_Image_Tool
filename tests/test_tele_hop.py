@@ -266,9 +266,14 @@ def main():
     DEM["updates"] = [up(50, NHOM_B, "/baocao@test_bot")]
     app.cfg["tele_nghe"] = True
     app.cfg["tele_offset"] = 0
+    DEM["tin"] = []          # xoá TRƯỚC khi bật: luồng nền có thể trả lời ngay
     app._bat_theo_doi()
+    # _bat_theo_doi chạy ở luồng nền (dừng long-poll cũ có thể lâu) -> phải chờ
+    t0 = time.time()
+    while time.time() - t0 < 20 and not (app.td and app.td.dang_chay()):
+        app.update()
+        time.sleep(0.05)
     kiem("bật theo dõi", app.td is not None and app.td.dang_chay(), str(app.td))
-    DEM["tin"] = []
     t0 = time.time()
     while time.time() - t0 < 12 and not DEM["tin"]:
         app.update()

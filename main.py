@@ -19,7 +19,7 @@ import traceback
 import webbrowser
 from tkinter import filedialog, messagebox, ttk
 
-APP_VERSION = "1.0.12"
+APP_VERSION = "1.0.13"
 APP_TEN = "LightVisual Image Tool"
 
 THU_MUC_GOC = os.path.dirname(os.path.abspath(__file__))
@@ -1588,21 +1588,33 @@ class App(tk.Tk):
 
     # -- nghe lệnh /baocao
     def _bat_theo_doi(self):
-        # luồng cũ phải tắt hẳn trước khi mở luồng mới, không thì 2 luồng
-        # cùng getUpdates -> 409 Conflict
-        if not self._dung_theo_doi():
-            return
         # chỉ nghe lệnh bằng token anh tự nhập; KHÔNG dùng token .env Hermes
         # (2 nơi cùng getUpdates sẽ tranh nhau -> 409, và làm chết bot Hermes)
         tok = (self.cfg.get("tele_token") or "").strip()
         if not tok or not self.cfg.get("tele_nghe", True):
+            self._dung_theo_doi()
             return
-        # log của luồng polling phải đi qua hàng đợi UI (Tk chỉ an toàn ở luồng chính)
-        self.td = tele.TheoDoi(tok, khi_lenh=self._co_lenh_baocao,
-                               log=lambda s: self.ui_q.put(("log", s)))
-        self.td.offset = int(self.cfg.get("tele_offset") or 0)
-        if self.td.bat_dau():
-            self._log("Telegram: đang nghe lệnh /baocao trong nhóm.")
+        # Dừng luồng cũ có thể phải chờ long-poll nhả kết nối (tới ~45s) -> phải
+        # chạy ở luồng nền, KHÔNG được chặn luồng GUI (nút Lưu sẽ đứng hình).
+        if getattr(self, "_dang_doi_bat", False):
+            return
+        self._dang_doi_bat = True
+        offset = int(self.cfg.get("tele_offset") or 0)
+
+        def chay():
+            try:
+                if not self._dung_theo_doi():
+                    return
+                td = tele.TheoDoi(tok, khi_lenh=self._co_lenh_baocao,
+                                  log=lambda s: self.ui_q.put(("log", s)))
+                td.offset = offset
+                if td.bat_dau():
+                    self.td = td
+                    self.ui_q.put(("log", "Telegram: đang nghe lệnh /baocao trong nhóm."))
+            finally:
+                self._dang_doi_bat = False
+
+        threading.Thread(target=chay, daemon=True).start()
 
     def _dung_theo_doi(self):
         """Dừng nghe lệnh. Trả True nếu đã dừng hẳn (an toàn để bật lại)."""

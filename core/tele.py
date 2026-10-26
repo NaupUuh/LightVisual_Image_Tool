@@ -488,10 +488,17 @@ class TheoDoi(object):
                 self.loi_cuoi = kq
                 dem_loi += 1
                 if "409" in str(kq) or "Conflict" in str(kq):
-                    # token này đang bị nơi khác getUpdates (vd bot Hermes) —
-                    # dừng ngay, không tranh chấp làm chết cả 2 bên
-                    self.log("Tele: token đang được nơi khác dùng để nghe lệnh (409). "
-                             "Hãy tạo bot riêng cho tool bằng @BotFather rồi dán token mới.")
+                    # 409 = có request getUpdates khác đang giữ kết nối. Thường chỉ
+                    # là tranh chấp tạm thời (mở 2 cửa sổ tool, hoặc 1 lần gọi thử
+                    # từ ngoài) -> phải THỬ LẠI, không được tắt luồng vĩnh viễn.
+                    if dem_loi < 5:
+                        self.log("Tele: tranh chấp getUpdates (409) — thử lại lần %d/5."
+                                 % dem_loi)
+                        self._stop.wait(3.0 * dem_loi)
+                        continue
+                    self.log("Tele: token đang được chương trình khác nghe lệnh (409) "
+                             "5 lần liên tiếp. Hãy tắt chương trình đó, hoặc tạo bot "
+                             "riêng bằng @BotFather rồi dán token mới.")
                     self._stop.set()
                     break
                 if dem_loi == 1:
