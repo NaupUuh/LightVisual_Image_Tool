@@ -176,4 +176,22 @@ python tests\test_key_dialog.py
 
 ## 8. Bản sao lưu
 - `Z:\HQData-2\TOOLS TỔNG HỢP\TOOLS UPDATE CUỐI\LightVisual_Image_Tool\` — bản sync, **không kèm key**.
-- GitHub: `https://github.com/NaupUuh/LightVisual_Image_Tool` — `config.json` + `tiep_tuc.json` + `output/` nằm trong `.gitignore`.
+- GitHub: `https://github.com/NaupUuh/LightVisual_Image_Tool` — `config.json` + `tiep_tuc.json` + `output/` + `Image/` nằm trong `.gitignore`.
+
+## 9. Sang máy khác (đóng gói bản sạch) — v1.0.8
+```
+cd C:\Users\Admin\Desktop\LightVisual_Image_Tool
+python _sang.py
+```
+→ tạo `Desktop\LightVisual_Image_Tool_v<ver>.zip` (~196 KB, 18 file) **và** thư mục rời cùng tên.
+
+- **Copy**: `main.py`, `updater.py`, `core/api.py`, `core/tele.py`, `run.bat`, `version.json`,
+  `cacert.pem`, `HUONG_DAN.txt`, `TIEP_TUC.md`, `tests/*`, `config.mau.json`.
+- **KHÔNG copy**: `config.json` (API key), `tiep_tuc.json` (trạng thái lượt chạy), `output/`,
+  `Image/`, `_backup_update/`, `__pycache__`, `.git`.
+- `config.mau.json` có **mọi key rỗng**; máy mới chỉ cần đổi tên thành `config.json`
+  (hoặc cứ chạy `run.bat`, tool tự sinh `config.json` rỗng) rồi bấm **API key** dán key.
+- Script tự kiểm: thiếu file bắt buộc → báo `THIEU FILE`; quét regex `LV_…`, `sk-…`, `<id>:<token>`
+  → nếu thấy key thật thì in `CANH BAO — có thể lộ key`.
+- Đã kiểm: giải nén zip ra thư mục trống → `python main.py` chạy được, `APP_VERSION = 1.0.8`,
+  nút Telegram hiện, hộp thoại mở OK, 4 bộ test 19/90/26/9 đều PASS.
