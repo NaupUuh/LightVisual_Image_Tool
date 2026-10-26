@@ -167,7 +167,7 @@ Ghi chú kỹ thuật:
   `/baocao@<username_bot>` — tool đã xử lý cả 2 dạng.
 - `tele_offset` (update_id cuối) lưu trong `config.json` để mở lại app không xử lý lặp lệnh cũ.
 - Quét nhóm sẽ **tạm dừng bộ nghe lệnh** rồi bật lại sau khi lưu (tránh 2 luồng cùng `getUpdates`).
-- Test: `tests/test_tele_nhom.py` (32 test: getMe, lay_nhom, lệnh, TheoDoi, BaoCao nhiều nhóm)
+- Test: `tests/test_tele_nhom.py` (34 test: getMe, lay_nhom, lệnh, TheoDoi, BaoCao nhiều nhóm)
   và `tests/test_tele_hop.py` (25 test GUI thật: Cập nhật → tick → Lưu → /baocao trả lời).
 
 ## 6. Việc còn lại

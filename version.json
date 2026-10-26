@@ -1,5 +1,5 @@
 {
   "version": "1.0.9",
-  "notes": "1.0.9: Nang cap bao cao Telegram. Dan bot token roi bam 'Cap nhat' -> tool goi getMe + getUpdates, liet ke moi nhom/kenh bot dang o (bang tick: Nhom | Chat ID). Bam dong de tick nhieu nhom nhan bao cao. Mac dinh 30 phut bao 1 lan (1-240). Them o 'Nghe lenh /baocao trong nhom': go /baocao hoac /bc trong nhom la tool tra bao cao ngay lap tuc (dang chay -> tien do hien tai; khong chay -> tong ket luot gan nhat). Tool chi dung token anh dan, KHONG dung token trong .env Hermes de tranh 409 Conflict voi bot Hermes. Luu tele_offset de mo lai app khong xu ly lap lenh cu. Them tests/test_tele_nhom.py (32 test) va tests/test_tele_hop.py (25 test GUI that).",
+  "notes": "1.0.9: Nang cap bao cao Telegram. Dan bot token roi bam 'Cap nhat' -> tool goi getMe + getUpdates, liet ke moi nhom/kenh bot dang o (bang tick: Nhom | Chat ID). Bam dong de tick nhom nhan bao cao. Mac dinh 30 phut bao 1 lan (1..240). Go /baocao hoac /bc trong nhom -> tool tra bao cao ngay. Tool chi dung token anh dan (khong lay token .env Hermes) de tranh 409 Conflict; gap 409 thi tu dung va huong dan tao bot rieng. Luu tele_chat_ids/tele_nhom_ten/tele_offset vao config. Test: 26 + 34 + 25 + 9 + 90 + 19 + 7 PASS.",
   "date": "2026-10-26"
 }
