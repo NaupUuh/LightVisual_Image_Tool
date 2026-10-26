@@ -1,4 +1,4 @@
 {
-  "version": "1.0.10",
-  "notes": "1.0.10: Don gian hoa bao cao Telegram — bo nut 'Cap nhat' va bang quet nhom. Hop thoai chi con: o Bot token (che), o ID nhom (nhap tay, nhieu nhom cach nhau dau phay; nhan -1001234567890, @tenkenh, https://t.me/tenkenh, hoac ID duong tu dong them -100), o so phut (mac dinh 30), nut Luu / Gui thu. ID sai -> bao do, khong luu. Chua biet ID: add bot vao nhom roi go /baocao — tool ghi ten nhom + ID ra o log de copy. Van giu: mac dinh 30 phut/lan, lenh /baocao hoac /baocao@bot trong nhom tra bao cao ngay, chi dung token anh dan (tranh 409 voi bot Hermes). Test: 26 + 34 + 23 + 9 + 90 + 19 + 7 PASS."
+  "version": "1.0.11",
+  "notes": "1.0.11: Sua 409 Conflict khi bat/tat/bat lai bao cao Telegram. TheoDoi.dung() gio cho long-poll nha ket noi (toi 45s) va tra True/False; main._dung_theo_doi() chi dat self.td=None khi luong da tat han; _bat_theo_doi() khong mo luong moi neu luong cu con treo -> khong con 2 luong cung getUpdates. Giu nguyen: hop thoai chi 2 o (bot token + ID nhom), mac dinh 30 phut/lan, lenh /baocao tra ngay, log ten+ID nhom moi thay. Test: 26 + 34 + 24 + 9 + 90 + 19 + 7 PASS."
 }

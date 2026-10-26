@@ -454,11 +454,20 @@ class TheoDoi(object):
         self._t.start()
         return True
 
-    def dung(self, cho=3.0):
+    def dung(self, cho=45.0):
+        """Dừng long-poll. Phải chờ đủ lâu: Telegram giữ request tới `timeout` giây,
+        nếu bật lại trước khi luồng cũ nhả kết nối thì 2 luồng cùng getUpdates
+        -> 409 Conflict và tool tự tắt nghe lệnh."""
         self._stop.set()
         t = self._t
         if t and t.is_alive():
             t.join(timeout=cho)
+        if t and t.is_alive():
+            # luồng cũ vẫn treo -> không cho bật luồng mới (tránh 409)
+            self.log("Tele: luồng nghe cũ chưa dừng hẳn — chờ thêm rồi bật lại.")
+            return False
+        self._t = None
+        return True
 
     def _loop(self):
         dem_loi = 0

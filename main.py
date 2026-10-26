@@ -19,7 +19,7 @@ import traceback
 import webbrowser
 from tkinter import filedialog, messagebox, ttk
 
-APP_VERSION = "1.0.10"
+APP_VERSION = "1.0.11"
 APP_TEN = "LightVisual Image Tool"
 
 THU_MUC_GOC = os.path.dirname(os.path.abspath(__file__))
@@ -1588,7 +1588,10 @@ class App(tk.Tk):
 
     # -- nghe lệnh /baocao
     def _bat_theo_doi(self):
-        self._dung_theo_doi()
+        # luồng cũ phải tắt hẳn trước khi mở luồng mới, không thì 2 luồng
+        # cùng getUpdates -> 409 Conflict
+        if not self._dung_theo_doi():
+            return
         # chỉ nghe lệnh bằng token anh tự nhập; KHÔNG dùng token .env Hermes
         # (2 nơi cùng getUpdates sẽ tranh nhau -> 409, và làm chết bot Hermes)
         tok = (self.cfg.get("tele_token") or "").strip()
@@ -1602,14 +1605,18 @@ class App(tk.Tk):
             self._log("Telegram: đang nghe lệnh /baocao trong nhóm.")
 
     def _dung_theo_doi(self):
-        if self.td:
-            try:
-                self.cfg["tele_offset"] = self.td.offset
-                self.td.dung()
-                luu_cfg(self.cfg)
-            except Exception:
-                pass
+        """Dừng nghe lệnh. Trả True nếu đã dừng hẳn (an toàn để bật lại)."""
+        if not self.td:
+            return True
+        try:
+            self.cfg["tele_offset"] = self.td.offset
+            sach = self.td.dung()
+            luu_cfg(self.cfg)
+        except Exception:
+            sach = True
+        if sach:
             self.td = None
+        return sach
 
     def _co_lenh_baocao(self, chat_id, ten):
         """Chạy trong luồng polling -> chỉ đẩy vào hàng đợi UI."""

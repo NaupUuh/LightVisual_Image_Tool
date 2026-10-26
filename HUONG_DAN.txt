@@ -1,4 +1,4 @@
-# LightVisual Image Tool — v1.0.10
+# LightVisual Image Tool — v1.0.11
 
 Tool Tkinter tạo ảnh hàng loạt qua API **lightvisual.studio** (không qua web, không cần mở trình duyệt).
 Chạy được trên **Python 3.9+**, không cần `pip install` gì (core dùng `urllib`).

@@ -1,6 +1,6 @@
 # TIẾP TỤC — LightVisual Image Tool
 
-Cập nhật: 2026-10-26 · **v1.0.10** · trạng thái: chạy thật OK với key thật (gói Grok Vô Hạn 1 ngày)
+Cập nhật: 2026-10-26 · **v1.0.11** · trạng thái: chạy thật OK với key thật (gói Grok Vô Hạn 1 ngày)
 
 ## 1. Tool này làm gì
 Tạo ảnh hàng loạt qua API lightvisual.studio (`POST /v1/images/generations`),
@@ -131,7 +131,7 @@ Test cũ chỉ đếm **tổng số MP4** nên không bắt được.
 lấy từ toàn bộ nội dung (hash). Đừng assert test bằng tổng số file — phải assert **file nào nằm
 trong thư mục nào**.
 
-## 5d. Báo cáo tiến độ lên Telegram (v1.0.10)
+## 5d. Báo cáo tiến độ lên Telegram (v1.0.11)
 Nút **📣 Telegram** ở góc phải trên, cạnh `API key`. Mở hộp thoại — **chỉ 2 ô nhập, không quét nhóm**:
 
 1. **Bật báo cáo Telegram** — mặc định TẮT.
@@ -170,7 +170,7 @@ Ghi chú kỹ thuật:
   sẽ tranh nhau và trả `409 Conflict`. Gặp 409 → tool tự dừng + nhắc tạo bot riêng.
 - Group privacy ON thì chỉ thấy lệnh dạng `/baocao@<username_bot>` — tool xử lý cả 2 dạng.
 - `tele_offset` (update_id cuối) lưu trong `config.json` để mở lại app không xử lý lặp lệnh cũ.
-- Test: `tests/test_tele_nhom.py` (34) + `tests/test_tele_hop.py` (23: hộp thoại token + ID nhóm,
+- Test: `tests/test_tele_nhom.py` (34) + `tests/test_tele_hop.py` (24: hộp thoại token + ID nhóm,
   đọc link/@kenh/ID dương, ID sai không lưu, `/baocao` trả lời).
 
 ## 6. Việc còn lại
@@ -199,7 +199,7 @@ python tests\test_key_dialog.py
 - `Z:\HQData-2\TOOLS TỔNG HỢP\TOOLS UPDATE CUỐI\LightVisual_Image_Tool\` — bản sync, **không kèm key**.
 - GitHub: `https://github.com/NaupUuh/LightVisual_Image_Tool` — `config.json` + `tiep_tuc.json` + `output/` + `Image/` nằm trong `.gitignore`.
 
-## 9. Sang máy khác (đóng gói bản sạch) — v1.0.10
+## 9. Sang máy khác (đóng gói bản sạch) — v1.0.11
 ```
 cd C:\Users\Admin\Desktop\LightVisual_Image_Tool
 python _sang.py
@@ -214,5 +214,5 @@ python _sang.py
   (hoặc cứ chạy `run.bat`, tool tự sinh `config.json` rỗng) rồi bấm **API key** dán key.
 - Script tự kiểm: thiếu file bắt buộc → báo `THIEU FILE`; quét regex `LV_…`, `sk-…`, `<id>:<token>`
   → nếu thấy key thật thì in `CANH BAO — có thể lộ key`.
-- Đã kiểm: giải nén zip ra thư mục trống → `python main.py` chạy được, `APP_VERSION = 1.0.10`,
+- Đã kiểm: giải nén zip ra thư mục trống → `python main.py` chạy được, `APP_VERSION = 1.0.11`,
   nút Telegram hiện, hộp thoại mở OK, 4 bộ test 19/90/26/9 đều PASS.
