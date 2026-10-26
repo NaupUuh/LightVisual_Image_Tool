@@ -1,5 +1,4 @@
 {
-  "version": "1.0.9",
-  "notes": "1.0.9: Nang cap bao cao Telegram. Dan bot token roi bam 'Cap nhat' -> tool goi getMe + getUpdates, liet ke moi nhom/kenh bot dang o (bang tick: Nhom | Chat ID). Bam dong de tick nhom nhan bao cao. Mac dinh 30 phut bao 1 lan (1..240). Go /baocao hoac /bc trong nhom -> tool tra bao cao ngay. Tool chi dung token anh dan (khong lay token .env Hermes) de tranh 409 Conflict; gap 409 thi tu dung va huong dan tao bot rieng. Luu tele_chat_ids/tele_nhom_ten/tele_offset vao config. Test: 26 + 34 + 25 + 9 + 90 + 19 + 7 PASS.",
-  "date": "2026-10-26"
+  "version": "1.0.10",
+  "notes": "1.0.10: Don gian hoa bao cao Telegram — bo nut 'Cap nhat' va bang quet nhom. Hop thoai chi con: o Bot token (che), o ID nhom (nhap tay, nhieu nhom cach nhau dau phay; nhan -1001234567890, @tenkenh, https://t.me/tenkenh, hoac ID duong tu dong them -100), o so phut (mac dinh 30), nut Luu / Gui thu. ID sai -> bao do, khong luu. Chua biet ID: add bot vao nhom roi go /baocao — tool ghi ten nhom + ID ra o log de copy. Van giu: mac dinh 30 phut/lan, lenh /baocao hoac /baocao@bot trong nhom tra bao cao ngay, chi dung token anh dan (tranh 409 voi bot Hermes). Test: 26 + 34 + 23 + 9 + 90 + 19 + 7 PASS."
 }

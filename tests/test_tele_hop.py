@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Kiểm hộp thoại Telegram mới: nhập token -> Cập nhật -> tick nhóm -> Lưu,
+"""Kiểm hộp thoại Telegram (nhập token + ID nhóm, không có nút Cập nhật)
 và lệnh /baocao trả báo cáo ngay. Dùng máy chủ Telegram giả, không gửi tin thật.
 
 Chạy: python tests/test_tele_hop.py
@@ -7,7 +7,6 @@ Chạy: python tests/test_tele_hop.py
 
 import json
 import os
-import shutil
 import sys
 import threading
 import time
@@ -86,6 +85,22 @@ class H(BaseHTTPRequestHandler):
     do_GET = do_POST
 
 
+def tim_nut(win, nhan):
+    """Tìm nút theo nhãn trong toàn bộ cây widget."""
+    thay = []
+
+    def duyet(w):
+        for c in w.winfo_children():
+            try:
+                if isinstance(c, tk.ttk.Button) and c.cget("text") == nhan:
+                    thay.append(c)
+            except Exception:
+                pass
+            duyet(c)
+    duyet(win)
+    return thay
+
+
 def main():
     ok = [0]
     loi = [0]
@@ -127,57 +142,21 @@ def main():
     if not ctl:
         app.destroy()
         return 1
-    tree, lbl = ctl["tree"], ctl["lbl"]
+    lbl = ctl["lbl"]
+    win = lbl.winfo_toplevel()
 
-    # ---- token + bấm Cập nhật
-    DEM["updates"] = [up(1, NHOM_A, "chào"), up(2, NHOM_B, "hi"),
-                      up(3, {"id": 999, "type": "private", "first_name": "X"}, "/baocao")]
+    kiem("không còn nút Cập nhật", len(tim_nut(win, "Cập nhật")) == 0,
+         str(len(tim_nut(win, "Cập nhật"))))
+    kiem("có ô token", ctl.get("tok") is not None)
+    kiem("có ô ID nhóm", ctl.get("id") is not None)
+    kiem("token bị che", str(ctl["tok"].cget("show")) == "•", str(ctl["tok"].cget("show")))
+
+    # ---- nhập token + ID nhóm
     ctl["tok"].delete(0, "end")
     ctl["tok"].insert(0, TOKEN)
-    ctl["btn"].invoke()
-    t0 = time.time()
-    while time.time() - t0 < 20:
-        app.update()
-        time.sleep(0.05)
-        if tree.get_children():
-            break
-    for _ in range(20):
-        app.update()
-        time.sleep(0.02)
-
-    dong = list(tree.get_children())
-    kiem("Cập nhật -> hiện 2 nhóm", len(dong) == 2, str(dong))
-    kiem("hiện đúng chat id âm", set(dong) == {"-1001234567890", "-1009876543210"}, str(dong))
-    kiem("hiện tên nhóm",
-         any("Nhóm Test A" in str(tree.item(d, "values")) for d in dong),
-         str([tree.item(d, "values") for d in dong]))
-    kiem("mặc định chưa tick", all(tree.item(d, "values")[0] == "☐" for d in dong),
-         str([tree.item(d, "values")[0] for d in dong]))
-    kiem("báo đã thấy nhóm", "2 nhóm" in lbl.cget("text"), lbl.cget("text"))
-
-    # ---- tick 1 nhóm (giả lập bấm chuột vào dòng)
-    bb = tree.bbox("-1001234567890", "#1")
-    tree.event_generate("<Button-1>", x=int(bb[0]) + 6, y=int(bb[1]) + 6)
-    tree.event_generate("<ButtonRelease-1>", x=int(bb[0]) + 6, y=int(bb[1]) + 6)
-    for _ in range(5):
-        app.update()
-    kiem("tick nhóm A", tree.item("-1001234567890", "values")[0] == "☑",
-         str(tree.item("-1001234567890", "values")))
-
-    # ---- lưu
-    win = tree.winfo_toplevel()
-    nut_luu = []
-    for w in win.winfo_children():
-        try:
-            con = w.winfo_children()
-        except Exception:
-            continue
-        for b in con:
-            try:
-                if isinstance(b, tk.ttk.Button) and b.cget("text") == "Lưu":
-                    nut_luu.append(b)
-            except Exception:
-                pass
+    ctl["id"].delete(0, "end")
+    ctl["id"].insert(0, "-1001234567890, -1009876543210")
+    nut_luu = tim_nut(win, "Lưu")
     kiem("thấy nút Lưu", len(nut_luu) == 1, str(nut_luu))
     if nut_luu:
         nut_luu[0].invoke()
@@ -185,22 +164,65 @@ def main():
         app.update()
         time.sleep(0.02)
 
-    kiem("lưu tele_chat_ids", app.cfg.get("tele_chat_ids") == ["-1001234567890"],
+    kiem("lưu 2 nhóm", app.cfg.get("tele_chat_ids") == ["-1001234567890", "-1009876543210"],
          str(app.cfg.get("tele_chat_ids")))
     kiem("lưu tele_chat_id đầu", app.cfg.get("tele_chat_id") == "-1001234567890",
          str(app.cfg.get("tele_chat_id")))
-    kiem("lưu tên nhóm", (app.cfg.get("tele_nhom_ten") or {}).get(
-        "-1001234567890") == "Nhóm Test A", str(app.cfg.get("tele_nhom_ten")))
     kiem("lưu 30 phút", int(app.cfg.get("tele_moi_phut")) == 30,
          str(app.cfg.get("tele_moi_phut")))
-    kiem("cfg ghi ra file", os.path.exists(T.CFG_FILE))
     with open(T.CFG_FILE, encoding="utf-8") as f:
         d = json.load(f)
-    kiem("file có tele_chat_ids", d.get("tele_chat_ids") == ["-1001234567890"], str(d))
+    kiem("cfg ghi ra file", d.get("tele_chat_ids") == ["-1001234567890", "-1009876543210"],
+         str(d.get("tele_chat_ids")))
+
+    # ---- nhập link + @kenh
+    app._hop_tele()
+    for _ in range(20):
+        app.update()
+    ctl2 = app._hop_tele_ctl
+    win2 = ctl2["lbl"].winfo_toplevel()
+    ctl2["id"].delete(0, "end")
+    ctl2["id"].insert(0, "https://t.me/nhomabc, @kenhxyz, 1001234567890")
+    n2 = tim_nut(win2, "Lưu")
+    if n2:
+        n2[0].invoke()
+    for _ in range(20):
+        app.update()
+        time.sleep(0.02)
+    kiem("đọc được link + @kenh + id dương",
+         app.cfg.get("tele_chat_ids") == ["@nhomabc", "@kenhxyz", "-1001234567890"],
+         str(app.cfg.get("tele_chat_ids")))
+
+    # ---- ID sai -> không lưu, báo lỗi
+    app._hop_tele()
+    for _ in range(20):
+        app.update()
+    ctl3 = app._hop_tele_ctl
+    win3 = ctl3["lbl"].winfo_toplevel()
+    ctl3["id"].delete(0, "end")
+    ctl3["id"].insert(0, "linh tinh")
+    n3 = tim_nut(win3, "Lưu")
+    if n3:
+        n3[0].invoke()
+    for _ in range(20):
+        app.update()
+    kiem("ID sai -> báo lỗi, không lưu",
+         "không đọc được" in ctl3["lbl"].cget("text")
+         and app.cfg.get("tele_chat_ids") == ["@nhomabc", "@kenhxyz", "-1001234567890"],
+         ctl3["lbl"].cget("text"))
+    win3.destroy()
+    for _ in range(5):
+        app.update()
+
+    # ---- đưa cfg về 1 nhóm để test gửi
+    app.cfg["tele_chat_ids"] = ["-1001234567890"]
+    app.cfg["tele_chat_id"] = "-1001234567890"
+    app.cfg["tele_token"] = TOKEN
+    app.cfg["tele_bat"] = True
+    app.cfg["tele_nghe"] = False
 
     # ---- BaoCao gửi tới nhóm đã chọn
     DEM["tin"] = []
-    app.cfg["tele_bat"] = True
     app._bat_baocao()
     kiem("BaoCao dùng nhóm đã chọn",
          app.bc is not None and app.bc.chat_ids == ["-1001234567890"],
@@ -243,9 +265,9 @@ def main():
     # ---- TheoDoi bắt lệnh trong nhóm -> đẩy vào ui_q
     DEM["updates"] = [up(50, NHOM_B, "/baocao@test_bot")]
     app.cfg["tele_nghe"] = True
+    app.cfg["tele_offset"] = 0
     app._bat_theo_doi()
-    kiem("bật theo dõi", app.td is not None and app.td.dang_chay(),
-         str(app.td))
+    kiem("bật theo dõi", app.td is not None and app.td.dang_chay(), str(app.td))
     DEM["tin"] = []
     t0 = time.time()
     while time.time() - t0 < 12 and not DEM["tin"]:
@@ -256,6 +278,9 @@ def main():
     if DEM["tin"]:
         kiem("trả lời vào đúng nhóm B", DEM["tin"][0]["chat_id"] == "-1009876543210",
              DEM["tin"][0]["chat_id"])
+    log_txt = app.txt_log.get("1.0", "end")
+    kiem("log ghi ID nhóm mới thấy", "-1009876543210" in log_txt,
+         log_txt[-200:])
     app._dung_theo_doi()
     kiem("dừng theo dõi", app.td is None)
 

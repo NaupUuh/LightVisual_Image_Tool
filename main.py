@@ -19,7 +19,7 @@ import traceback
 import webbrowser
 from tkinter import filedialog, messagebox, ttk
 
-APP_VERSION = "1.0.9"
+APP_VERSION = "1.0.10"
 APP_TEN = "LightVisual Image Tool"
 
 THU_MUC_GOC = os.path.dirname(os.path.abspath(__file__))
@@ -1373,51 +1373,37 @@ class App(tk.Tk):
         w = tk.Toplevel(self)
         w.title("Báo cáo tiến độ lên Telegram")
         w.configure(bg=NEN)
-        w.geometry("700x620")
-        w.minsize(640, 560)
+        w.geometry("700x430")
+        w.minsize(640, 400)
         w.transient(self)
         w.grab_set()
 
-        ttk.Label(w, text="Dán bot token rồi bấm “Cập nhật” — tool sẽ liệt kê các nhóm/kênh "
-                          "bot đang ở. Tick nhóm muốn nhận báo cáo, đặt số phút, bấm Lưu.",
+        ttk.Label(w, text="Dán bot token và ID nhóm nhận báo cáo, đặt số phút, bấm Lưu.",
                   style="TLabel", wraplength=660, justify="left").grid(
-            row=0, column=0, columnspan=3, sticky="w", padx=16, pady=(14, 6))
+            row=0, column=0, columnspan=2, sticky="w", padx=16, pady=(14, 6))
 
         var_bat = tk.BooleanVar(value=bool(self.cfg.get("tele_bat")))
         var_nghe = tk.BooleanVar(value=bool(self.cfg.get("tele_nghe", True)))
         ttk.Checkbutton(w, text="Bật báo cáo Telegram", variable=var_bat).grid(
-            row=1, column=0, columnspan=3, sticky="w", padx=16, pady=(0, 6))
+            row=1, column=0, columnspan=2, sticky="w", padx=16, pady=(0, 8))
 
         ttk.Label(w, text="Bot token").grid(row=2, column=0, sticky="w", padx=16, pady=5)
-        e_tok = ttk.Entry(w, width=44, show="•")
-        e_tok.grid(row=2, column=1, sticky="ew", pady=5)
-        btn_cap = ttk.Button(w, text="Cập nhật", width=12, command=lambda: quet())
-        btn_cap.grid(row=2, column=2, sticky="w", padx=(8, 16), pady=5)
+        e_tok = ttk.Entry(w, width=52, show="•")
+        e_tok.grid(row=2, column=1, sticky="ew", padx=(0, 16), pady=5)
 
-        ttk.Label(w, text="Nhóm nhận báo cáo").grid(row=3, column=0, columnspan=3,
-                                                    sticky="w", padx=16, pady=(8, 2))
-        khung = tk.Frame(w, bg=NEN2, highlightbackground=VIEN, highlightthickness=1)
-        khung.grid(row=4, column=0, columnspan=3, sticky="nsew", padx=16)
-        tree = ttk.Treeview(khung, columns=("chon", "ten", "id"), show="headings",
-                            height=8, selectmode="browse")
-        tree.heading("chon", text="✓")
-        tree.heading("ten", text="Nhóm / kênh")
-        tree.heading("id", text="Chat ID")
-        tree.column("chon", width=36, anchor="center", stretch=False)
-        tree.column("ten", width=340, anchor="w")
-        tree.column("id", width=180, anchor="w", stretch=False)
-        sb = ttk.Scrollbar(khung, orient="vertical", command=tree.yview)
-        tree.configure(yscrollcommand=sb.set)
-        tree.pack(side="left", fill="both", expand=True)
-        sb.pack(side="right", fill="y")
+        ttk.Label(w, text="ID nhóm").grid(row=3, column=0, sticky="w", padx=16, pady=5)
+        e_id = ttk.Entry(w, width=52)
+        e_id.grid(row=3, column=1, sticky="ew", padx=(0, 16), pady=5)
 
-        ttk.Label(w, text="Bấm 1 dòng để tick / bỏ tick. Nhóm chỉ hiện khi bot đã được add vào "
-                          "nhóm đó (và có ai nhắn 1 câu, hoặc bot vừa được thêm).",
+        ttk.Label(w, text="Nhiều nhóm thì cách nhau dấu phẩy. Nhận: -1001234567890 · "
+                          "@tenkenh · https://t.me/tenkenh\n"
+                          "Chưa biết ID? Add bot vào nhóm rồi gõ /baocao trong nhóm — "
+                          "tool ghi ID nhóm ra ô log.",
                   style="Mo.TLabel", wraplength=660, justify="left").grid(
-            row=5, column=0, columnspan=3, sticky="w", padx=16, pady=(4, 6))
+            row=4, column=0, columnspan=2, sticky="w", padx=16, pady=(0, 8))
 
         f = ttk.Frame(w)
-        f.grid(row=6, column=0, columnspan=3, sticky="ew", padx=16, pady=(0, 4))
+        f.grid(row=5, column=0, columnspan=2, sticky="ew", padx=16, pady=(4, 0))
         ttk.Label(f, text="Gửi tiến độ mỗi (phút)").pack(side="left")
         sp_phut = tk.Spinbox(f, from_=1, to=240, width=6, bg=NEN2, fg=CHU,
                              buttonbackground=NEN2, relief="flat", justify="center")
@@ -1428,68 +1414,25 @@ class App(tk.Tk):
         except Exception:
             phut_cu = 30
         sp_phut.insert(0, str(phut_cu))
-        ttk.Checkbutton(f, text="Nghe lệnh /baocao trong nhóm", variable=var_nghe).pack(side="left")
+        ttk.Checkbutton(f, text="Nghe lệnh /baocao trong nhóm",
+                        variable=var_nghe).pack(side="left")
 
         lbl = ttk.Label(w, text="", style="Mo.TLabel", wraplength=660, justify="left")
-        lbl.grid(row=7, column=0, columnspan=3, sticky="w", padx=16, pady=(4, 0))
+        lbl.grid(row=6, column=0, columnspan=2, sticky="w", padx=16, pady=(8, 0))
 
         h = ttk.Frame(w)
-        h.grid(row=8, column=0, columnspan=3, sticky="ew", padx=16, pady=12)
+        h.grid(row=7, column=0, columnspan=2, sticky="ew", padx=16, pady=14)
         ttk.Button(h, text="Gửi thử", command=lambda: thu()).pack(side="left")
         ttk.Button(h, text="Lưu", command=lambda: luu()).pack(side="right")
         ttk.Button(h, text="Huỷ", command=w.destroy).pack(side="right", padx=(0, 8))
         w.columnconfigure(1, weight=1)
-        w.rowconfigure(4, weight=1)
-
-        # trạng thái tick, giữ giữa các lần quét
-        da_tick = set()
-        for x in (self.cfg.get("tele_chat_ids") or []):
-            if str(x or "").strip():
-                da_tick.add(str(x).strip())
-        ten_da_luu = dict(self.cfg.get("tele_nhom_ten") or {})
-
-        def ve(ds, giu=True):
-            tree.delete(*tree.get_children())
-            for n in ds:
-                cid = str(n.get("id"))
-                tree.insert("", "end", iid=cid,
-                            values=("☑" if (giu and cid in da_tick) else "☐",
-                                    n.get("title") or cid, cid))
-            for cid, ten in ten_da_luu.items():
-                if cid not in tree.get_children():
-                    tree.insert("", "end", iid=cid,
-                                values=("☑" if (giu and cid in da_tick) else "☐",
-                                        ten or cid, cid))
-
-        def doi_dau(e=None):
-            it = ""
-            if e is not None and getattr(e, "num", None) == 1:
-                try:
-                    it = tree.identify_row(e.y)
-                except Exception:
-                    it = ""
-            if not it:
-                it = tree.focus()
-            if not it:
-                return
-            v = list(tree.item(it, "values"))
-            if not v:
-                return
-            if v[0] == "☑":
-                v[0] = "☐"
-                da_tick.discard(it)
-            else:
-                v[0] = "☑"
-                da_tick.add(it)
-            tree.item(it, values=v)
-
-        tree.bind("<Button-1>", doi_dau)
-        tree.bind("<space>", doi_dau)
-        ve([])
 
         tok_hien = (self.cfg.get("tele_token") or "").strip()
         if tok_hien:
             e_tok.insert(0, tok_hien)
+        id_hien = ", ".join(self._ds_chat_nhan())
+        if id_hien:
+            e_id.insert(0, id_hien)
 
         def lay_tok():
             # chỉ dùng token anh dán vào — KHÔNG rơi về token trong .env Hermes
@@ -1502,62 +1445,53 @@ class App(tk.Tk):
             except Exception:
                 return 30
 
-        def quet():
-            tok = lay_tok()
-            if not tok:
-                lbl.configure(text="Chưa có bot token. Dán token bot của anh vào ô trên.",
-                              foreground=DO)
-                return
-            lbl.configure(text="Đang quét nhóm… (giữ nguyên hộp thoại này)",
-                          foreground=CHU_MO)
-            btn_cap.configure(state="disabled", text="Đang quét…")
-            w.update_idletasks()
-            # tạm dừng bộ nghe lệnh để không tranh getUpdates (lỗi 409)
-            self._dung_theo_doi()
-
-            def chay():
-                ok, me = tele.get_me(tok)
-                if not ok:
-                    self.ui_q.put(("tele_nhom", (False, me, [], "")))
-                    return
-                off = int(self.cfg.get("tele_offset") or 0)
-                ds, off2, loi = tele.lay_nhom(tok, giay=8.0, offset=off)
-                # không thấy nhóm nào mà offset đang > 0 (các update cũ đã bị
-                # đánh dấu đã đọc) -> quét lại từ đầu để bắt sự kiện add bot
-                if not ds and off > 0:
-                    ds2, off3, loi2 = tele.lay_nhom(tok, giay=6.0, offset=0)
-                    if ds2:
-                        ds = ds2
-                    off2 = max(off2, off3)
-                    loi = loi or loi2
-                self.cfg["tele_offset"] = max(int(off2 or 0), off)
-                self.ui_q.put(("tele_nhom", (True, me.get("username") or "", ds, loi)))
-            threading.Thread(target=chay, daemon=True).start()
+        def doc_ids():
+            """Đọc ô ID -> (danh sách id hợp lệ, danh sách chuỗi sai)."""
+            raw = (e_id.get() or "").replace(";", ",").replace("\n", ",")
+            ds, sai = [], []
+            for phan in raw.split(","):
+                phan = phan.strip()
+                if not phan:
+                    continue
+                cid, _ten = tele.tach_chat_id(phan)
+                if cid:
+                    if cid not in ds:
+                        ds.append(cid)
+                else:
+                    sai.append(phan)
+            return ds, sai
 
         def luu():
             tok = lay_tok()
             phut = doc_phut()
+            ds, sai = doc_ids()
+            if sai:
+                lbl.configure(text="ID không đọc được: %s" % ", ".join(sai), foreground=DO)
+                return
+            if var_bat.get() and not tok:
+                lbl.configure(text="Chưa có bot token.", foreground=DO)
+                return
+            if var_bat.get() and not ds:
+                lbl.configure(text="Chưa có ID nhóm nhận báo cáo — tool sẽ chỉ nghe lệnh, "
+                                    "chưa gửi báo cáo tự động.", foreground=VANG)
             self.cfg["tele_bat"] = bool(var_bat.get())
             self.cfg["tele_token"] = tok
             self.cfg["tele_nghe"] = bool(var_nghe.get())
             self.cfg["tele_moi_phut"] = phut
-            ds = [c for c in tree.get_children() if c in da_tick]
             self.cfg["tele_chat_ids"] = ds
             self.cfg["tele_chat_id"] = ds[0] if ds else ""
-            ten = {}
-            for c in tree.get_children():
-                v = tree.item(c, "values")
-                if v and len(v) > 1:
-                    ten[c] = v[1]
-            for c in ds:
-                if c not in ten:
-                    ten[c] = ten_da_luu.get(c, c)
+            ten = dict(self.cfg.get("tele_nhom_ten") or {})
+            for c in list(ten):
+                if c not in ds:
+                    ten.pop(c, None)
             self.cfg["tele_nhom_ten"] = ten
             luu_cfg(self.cfg)
             self._dung_baocao()
             self._cap_nhat_tele_label()
             if self.cfg["tele_bat"] and self.cfg.get("tele_nghe"):
                 self._bat_theo_doi()
+            else:
+                self._dung_theo_doi()
             w.destroy()
             self._log("Telegram: đã lưu — bật=%s, %d nhóm, mỗi %d phút, nghe /baocao=%s."
                       % ("có" if self.cfg["tele_bat"] else "không", len(ds), phut,
@@ -1565,12 +1499,15 @@ class App(tk.Tk):
 
         def thu():
             tok = lay_tok()
-            ds = [c for c in tree.get_children() if c in da_tick]
+            ds, sai = doc_ids()
             if not tok:
                 lbl.configure(text="Thiếu bot token.", foreground=DO)
                 return
+            if sai:
+                lbl.configure(text="ID không đọc được: %s" % ", ".join(sai), foreground=DO)
+                return
             if not ds:
-                lbl.configure(text="Tick ít nhất 1 nhóm để gửi thử.", foreground=DO)
+                lbl.configure(text="Nhập ít nhất 1 ID nhóm để gửi thử.", foreground=DO)
                 return
             lbl.configure(text="Đang gửi thử tới %d nhóm…" % len(ds), foreground=CHU_MO)
             w.update_idletasks()
@@ -1585,36 +1522,7 @@ class App(tk.Tk):
                 self.ui_q.put(("tele_thu", (not loi, "; ".join(loi), "%d nhóm" % len(ds))))
             threading.Thread(target=chay, daemon=True).start()
 
-        self._hop_tele_ctl = {"lbl": lbl, "tree": tree, "ve": ve, "btn": btn_cap,
-                              "tick": da_tick, "tok": e_tok}
-        # nếu đã có token sẵn thì quét luôn cho anh thấy nhóm ngay
-        if tok_hien:
-            self.after(120, quet)
-
-    def _hien_kq_quet_nhom(self, ok, username, ds, loi):
-        ctl = getattr(self, "_hop_tele_ctl", None)
-        if not ctl:
-            return
-        lbl, tree, ve, btn = ctl["lbl"], ctl["tree"], ctl["ve"], ctl["btn"]
-        try:
-            btn.configure(state="normal", text="Cập nhật")
-            if not ok:
-                lbl.configure(text="Token không dùng được: %s" % username, foreground=DO)
-                return
-            ve(ds, True)
-            n = len(tree.get_children())
-            if loi:
-                lbl.configure(text="Bot @%s — quét xong nhưng có lỗi: %s" % (username, loi),
-                              foreground=VANG)
-            elif n:
-                lbl.configure(text="Bot @%s — thấy %d nhóm. Bấm dòng để tick nhóm nhận báo cáo."
-                              % (username, n), foreground=XANH)
-            else:
-                lbl.configure(text="Bot @%s chưa thấy nhóm nào. Add bot vào nhóm, rồi nhắn 1 câu "
-                                   "trong nhóm (hoặc /start@%s) và bấm Cập nhật lại."
-                              % (username, username), foreground=VANG)
-        except tk.TclError:
-            pass
+        self._hop_tele_ctl = {"lbl": lbl, "tok": e_tok, "id": e_id}
 
     def _hien_kq_tele_thu(self, ok, loi, chat):
         hop = getattr(self, "_hop_tele_ctl", None)
@@ -1674,7 +1582,8 @@ class App(tk.Tk):
             phut = int(self.cfg.get("tele_moi_phut") or 30)
         except Exception:
             phut = 30
-        self.bc = tele.BaoCao(tok, "", moi_giay=phut * 60, log=self._log, chat_ids=ds)
+        self.bc = tele.BaoCao(tok, "", moi_giay=phut * 60, chat_ids=ds,
+                              log=lambda s: self.ui_q.put(("log", s)))
         self.bc.bat_dau_worker()
 
     # -- nghe lệnh /baocao
@@ -1685,7 +1594,9 @@ class App(tk.Tk):
         tok = (self.cfg.get("tele_token") or "").strip()
         if not tok or not self.cfg.get("tele_nghe", True):
             return
-        self.td = tele.TheoDoi(tok, khi_lenh=self._co_lenh_baocao, log=self._log)
+        # log của luồng polling phải đi qua hàng đợi UI (Tk chỉ an toàn ở luồng chính)
+        self.td = tele.TheoDoi(tok, khi_lenh=self._co_lenh_baocao,
+                               log=lambda s: self.ui_q.put(("log", s)))
         self.td.offset = int(self.cfg.get("tele_offset") or 0)
         if self.td.bat_dau():
             self._log("Telegram: đang nghe lệnh /baocao trong nhóm.")
@@ -1784,8 +1695,6 @@ class App(tk.Tk):
                     self._hien_kq_kiem_key(gt)
                 elif loai == "tele_thu":
                     self._hien_kq_tele_thu(*gt)
-                elif loai == "tele_nhom":
-                    self._hien_kq_quet_nhom(*gt)
                 elif loai == "tele_lenh":
                     self._tra_loi_baocao(*gt)
                 elif loai == "dem_tc":

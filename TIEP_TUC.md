@@ -1,6 +1,6 @@
 # TIẾP TỤC — LightVisual Image Tool
 
-Cập nhật: 2026-10-26 · **v1.0.9** · trạng thái: chạy thật OK với key thật (gói Grok Vô Hạn 1 ngày)
+Cập nhật: 2026-10-26 · **v1.0.10** · trạng thái: chạy thật OK với key thật (gói Grok Vô Hạn 1 ngày)
 
 ## 1. Tool này làm gì
 Tạo ảnh hàng loạt qua API lightvisual.studio (`POST /v1/images/generations`),
@@ -131,18 +131,24 @@ Test cũ chỉ đếm **tổng số MP4** nên không bắt được.
 lấy từ toàn bộ nội dung (hash). Đừng assert test bằng tổng số file — phải assert **file nào nằm
 trong thư mục nào**.
 
-## 5d. Báo cáo tiến độ lên Telegram (v1.0.9)
-Nút **📣 Telegram** ở góc phải trên, cạnh `API key`. Mở hộp thoại:
+## 5d. Báo cáo tiến độ lên Telegram (v1.0.10)
+Nút **📣 Telegram** ở góc phải trên, cạnh `API key`. Mở hộp thoại — **chỉ 2 ô nhập, không quét nhóm**:
 
 1. **Bật báo cáo Telegram** — mặc định TẮT.
-2. **Bot token** — dán token bot (dạng `123456789:AA…`). Token được che (`•`) khi hiện.
-3. Bấm **Cập nhật** → tool gọi `getMe` (hiện `@username` bot) rồi `getUpdates`,
-   **liệt kê mọi nhóm/kênh bot đang ở** (bảng: `✓ | Nhóm / kênh | Chat ID`).
-4. **Bấm 1 dòng để tick / bỏ tick** nhóm muốn nhận báo cáo (tick nhiều nhóm được).
-5. **Gửi tiến độ mỗi (phút)** — mặc định **30**, cho 1…240.
-6. **Nghe lệnh /baocao trong nhóm** — mặc định BẬT: gõ `/baocao` (hoặc `/bc`) trong nhóm,
-   tool trả báo cáo **ngay lúc đó** vào đúng nhóm đó.
-7. **Gửi thử** kiểm tra token/nhóm, **Lưu** ghi vào `config.json`.
+2. **Bot token** — dán token bot (dạng `123456789:AA…`), hiện che (`•`).
+3. **ID nhóm** — dán ID nhóm/kênh nhận báo cáo. Nhận các dạng:
+   - `-1001234567890` (ID nhóm, luôn âm)
+   - `1001234567890` → tự thêm dấu `-` đầu
+   - `@tenkenh` (kênh công khai, bot phải là admin)
+   - `https://t.me/tenkenh` → đổi thành `@tenkenh`
+   - Nhiều nhóm: cách nhau **dấu phẩy** (hoặc `;`, hoặc xuống dòng).
+   - ID sai → báo đỏ, **không lưu**.
+4. **Gửi tiến độ mỗi (phút)** — mặc định **30**, cho 1…240.
+5. **Nghe lệnh /baocao trong nhóm** — mặc định BẬT.
+6. **Gửi thử** kiểm tra, **Lưu** ghi `config.json`.
+
+**Chưa biết ID nhóm?** Add bot vào nhóm → gõ `/baocao` trong nhóm → tool ghi ra ô log:
+`Telegram: thấy nhóm "Tên nhóm" — ID -1001234567890` → copy ID đó dán vào ô.
 
 3 loại tin tự động:
 1. **BẮT ĐẦU** — loại việc, model, tổng số việc (kèm số đã xong trước đó), số luồng, thư mục ra.
@@ -156,19 +162,16 @@ Nút **📣 Telegram** ở góc phải trên, cạnh `API key`. Mở hộp tho�
 
 Ghi chú kỹ thuật:
 - `core/tele.py` — thuần stdlib (`urllib`), không cần pip; chạy được Python 3.9+.
-- Luồng gửi là **thread riêng có hàng đợi**, nên gọi mạng không làm treo GUI; khi app đóng vẫn gửi nốt tin kết thúc.
-- **Token luôn bị che** trong log (`123456789:…`), không ghi vào log.
+- Luồng gửi là **thread riêng có hàng đợi**, nên gọi mạng không làm treo GUI.
+- **Token luôn bị che** trong log, không ghi ra file log.
 - Mạng lỗi / token sai → chỉ ghi log, **không ảnh hưởng lượt chạy**.
 - **`getUpdates` chỉ được chạy 1 nơi cho mỗi token.** Tool chỉ nghe lệnh bằng token anh dán
   vào hộp thoại; **không** tự dùng token trong `.env` của Hermes — nếu dùng, bot Hermes và tool
-  sẽ tranh nhau và trả `409 Conflict`.
-- Nhóm chỉ hiện trong danh sách khi **bot đã được add vào nhóm** và có ít nhất 1 update
-  (ai đó nhắn 1 câu, hoặc bot vừa được thêm). Group privacy ON thì chỉ thấy lệnh dạng
-  `/baocao@<username_bot>` — tool đã xử lý cả 2 dạng.
+  sẽ tranh nhau và trả `409 Conflict`. Gặp 409 → tool tự dừng + nhắc tạo bot riêng.
+- Group privacy ON thì chỉ thấy lệnh dạng `/baocao@<username_bot>` — tool xử lý cả 2 dạng.
 - `tele_offset` (update_id cuối) lưu trong `config.json` để mở lại app không xử lý lặp lệnh cũ.
-- Quét nhóm sẽ **tạm dừng bộ nghe lệnh** rồi bật lại sau khi lưu (tránh 2 luồng cùng `getUpdates`).
-- Test: `tests/test_tele_nhom.py` (34 test: getMe, lay_nhom, lệnh, TheoDoi, BaoCao nhiều nhóm)
-  và `tests/test_tele_hop.py` (25 test GUI thật: Cập nhật → tick → Lưu → /baocao trả lời).
+- Test: `tests/test_tele_nhom.py` (34) + `tests/test_tele_hop.py` (23: hộp thoại token + ID nhóm,
+  đọc link/@kenh/ID dương, ID sai không lưu, `/baocao` trả lời).
 
 ## 6. Việc còn lại
 1. Gói hiện tại chỉ **1 ngày / 1 luồng** → muốn nhiều luồng song song thật thì nâng gói hoặc thêm nhiều key.
@@ -196,7 +199,7 @@ python tests\test_key_dialog.py
 - `Z:\HQData-2\TOOLS TỔNG HỢP\TOOLS UPDATE CUỐI\LightVisual_Image_Tool\` — bản sync, **không kèm key**.
 - GitHub: `https://github.com/NaupUuh/LightVisual_Image_Tool` — `config.json` + `tiep_tuc.json` + `output/` + `Image/` nằm trong `.gitignore`.
 
-## 9. Sang máy khác (đóng gói bản sạch) — v1.0.9
+## 9. Sang máy khác (đóng gói bản sạch) — v1.0.10
 ```
 cd C:\Users\Admin\Desktop\LightVisual_Image_Tool
 python _sang.py
@@ -211,5 +214,5 @@ python _sang.py
   (hoặc cứ chạy `run.bat`, tool tự sinh `config.json` rỗng) rồi bấm **API key** dán key.
 - Script tự kiểm: thiếu file bắt buộc → báo `THIEU FILE`; quét regex `LV_…`, `sk-…`, `<id>:<token>`
   → nếu thấy key thật thì in `CANH BAO — có thể lộ key`.
-- Đã kiểm: giải nén zip ra thư mục trống → `python main.py` chạy được, `APP_VERSION = 1.0.9`,
+- Đã kiểm: giải nén zip ra thư mục trống → `python main.py` chạy được, `APP_VERSION = 1.0.10`,
   nút Telegram hiện, hộp thoại mở OK, 4 bộ test 19/90/26/9 đều PASS.

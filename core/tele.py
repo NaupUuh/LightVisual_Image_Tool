@@ -17,6 +17,7 @@ import html
 import json
 import os
 import queue
+import re
 import threading
 import time
 import urllib.parse
@@ -220,6 +221,38 @@ def ten_nhom(chat):
         return ""
     return (chat.get("title") or chat.get("username")
             or chat.get("first_name") or str(chat.get("id") or ""))
+
+
+def tach_chat_id(raw):
+    """Đọc Chat ID hoặc link nhóm -> (chat_id, tên_gợi_ý).
+
+    Nhận: "-1001234567890", "1001234567890" (tự thêm -100), "@tenkenh",
+    "https://t.me/tenkenh", "https://t.me/+AbCdEf", "t.me/joinchat/AbCdEf".
+    Link mời riêng tư không suy ra được số -> trả ("", "").
+    """
+    s = (raw or "").strip()
+    if not s:
+        return "", ""
+    if s.startswith("@"):
+        ten = s[1:].strip()
+        return (("@" + ten) if ten else ""), ten
+    m = re.match(r"^(?:https?://)?(?:www\.)?t(?:elegram)?\.me/(.+)$", s, re.I)
+    if m:
+        duong = m.group(1).strip().strip("/")
+        if duong.lower().startswith("joinchat/") or duong.startswith("+"):
+            return "", ""
+        duong = duong.split("?")[0].split("/")[0]
+        if not duong:
+            return "", ""
+        return "@" + duong, duong
+    so = re.sub(r"[\s.]", "", s)
+    if re.match(r"^-?\d+$", so):
+        if so.startswith("-"):
+            return so, ""
+        if so.startswith("100"):
+            return "-" + so, ""
+        return so, ""
+    return "", ""
 
 
 def la_lenh_baocao(text, bot_username=""):
@@ -460,9 +493,15 @@ class TheoDoi(object):
                     pass
                 c = chat_cua_update(up)
                 if c and str(c.get("type")) in LOAI_NHOM:
-                    self.nhom[str(c.get("id"))] = {"id": str(c.get("id")),
-                                                   "type": str(c.get("type")),
-                                                   "title": ten_nhom(c)}
+                    cid = str(c.get("id"))
+                    moi = cid not in self.nhom
+                    self.nhom[cid] = {"id": cid,
+                                      "type": str(c.get("type")),
+                                      "title": ten_nhom(c)}
+                    if moi:
+                        # ghi ID ra log để anh copy dán vào ô "ID nhóm"
+                        self.log("Telegram: thấy nhóm \"%s\" — ID %s"
+                                 % (ten_nhom(c), cid))
                 if not self.khi_lenh:
                     continue
                 txt = text_cua_update(up)
