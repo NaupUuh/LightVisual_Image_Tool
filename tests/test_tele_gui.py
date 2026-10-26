@@ -111,6 +111,7 @@ def main():
     with open(T.CFG_FILE, "w", encoding="utf-8") as f:
         json.dump({"api_key": "LV_ok", "thu_muc_ra": out, "mo_khi_xong": False,
                    "tele_bat": True, "tele_token": TOKEN, "tele_chat_id": "8446",
+                   "tele_chat_ids": ["8446"], "tele_nghe": False,
                    "tele_moi_phut": 1}, f)
 
     app = T.App()

@@ -102,7 +102,8 @@ def main():
     kiem("gui() sai token -> lỗi", o is False and "401" in l, l)
 
     o, l = tele.gui(TOKEN, "999", "FAIL")
-    kiem("gui() lỗi 400 trả mô tả", o is False and "chat not found" in l, l)
+    kiem("gui() lỗi 400 trả mô tả dễ hiểu",
+         o is False and "400" in l and "chưa được add" in l, l)
 
     # gui("") rơi về lay_token() (có thể đọc .env Hermes) nên phải chặn fallback
     # để kiểm đúng nhánh thiếu token

@@ -1,4 +1,4 @@
-# LightVisual Image Tool — v1.0.8
+# LightVisual Image Tool — v1.0.9
 
 Tool Tkinter tạo ảnh hàng loạt qua API **lightvisual.studio** (không qua web, không cần mở trình duyệt).
 Chạy được trên **Python 3.9+**, không cần `pip install` gì (core dùng `urllib`).
@@ -92,16 +92,23 @@ Folder gốc\
 ## 6b. Báo cáo tiến độ lên Telegram
 
 Nút **📣 Telegram** (góc phải trên):
-- **Bật báo cáo Telegram** — mặc định TẮT.
-- **Bot token** — để trống thì lấy `TELEGRAM_BOT_TOKEN` trong `.env` của Hermes.
-- **Chat ID** — ID chat nhận tin.
-- **Gửi tiến độ mỗi (phút)** — 1…60, mặc định 5.
-- **Gửi thử** để kiểm tra ngay, **Lưu** để ghi vào `config.json`.
+
+1. **Bật báo cáo Telegram** — mặc định TẮT.
+2. **Bot token** — dán token bot. (Tool chỉ dùng token anh dán; **không** tự lấy token trong `.env`.)
+3. Bấm **Cập nhật** → hiện `@username` bot + **bảng các nhóm/kênh bot đang ở** (`✓ | Nhóm | Chat ID`).
+4. **Bấm vào dòng để tick** nhóm muốn nhận báo cáo — tick được nhiều nhóm.
+5. **Gửi tiến độ mỗi (phút)** — mặc định **30**.
+6. **Nghe lệnh /baocao trong nhóm** — gõ `/baocao` trong nhóm là tool trả báo cáo ngay.
+7. **Gửi thử** để kiểm tra, **Lưu** để ghi vào `config.json`.
 
 Tool gửi 3 tin: **BẮT ĐẦU** (loại việc, model, tổng việc, số luồng, thư mục ra),
 **TIẾN ĐỘ** (mỗi N phút: thanh tiến độ, OK/Lỗi/Dừng, đã chạy, còn khoảng bao lâu),
 **KẾT THÚC** (tổng kết + đường dẫn thư mục ra). Bấm **DỪNG** cũng gửi 1 tin báo.
 Token bị che khi ghi log; mất mạng chỉ ghi log, không ảnh hưởng lượt chạy.
+
+**`/baocao`** (hoặc `/bc`): đang chạy → tiến độ hiện tại; không chạy → tổng kết lượt gần nhất.
+Nhóm chỉ hiện trong danh sách khi bot **đã được add vào nhóm** và có ít nhất 1 tin nhắn
+(hoặc bot vừa được thêm). Group privacy ON thì dùng `/baocao@<username_bot>`.
 
 ## 7. Lỗi thường gặp
 

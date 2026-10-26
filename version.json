@@ -1,5 +1,5 @@
 {
-  "version": "1.0.8",
-  "notes": "1.0.8: Them bao cao tien do len Telegram. Nut moi 'Telegram' o goc phai tren: bat/tat, bot token, chat ID, so phut moi lan bao. Tool tu gui 3 loai tin: BAT DAU (loai viec, model, tong so viec, so luong, thu muc ra), TIEN DO dinh ky (thanh tien do, OK/Loi/Dung, da chay, con khoang bao lau, giay/viec), KET THUC (tong ket + duong dan thu muc ra). Bam DUNG cung gui tin bao. De trong o token thi tool tu lay TELEGRAM_BOT_TOKEN trong .env cua Hermes. Token duoc che khi ghi log. Them tests/test_tele.py (26 test) va tests/test_tele_gui.py (9 test chay GUI that voi may chu gia).",
+  "version": "1.0.9",
+  "notes": "1.0.9: Nang cap bao cao Telegram. Dan bot token roi bam 'Cap nhat' -> tool goi getMe + getUpdates, liet ke moi nhom/kenh bot dang o (bang tick: Nhom | Chat ID). Bam dong de tick nhieu nhom nhan bao cao. Mac dinh 30 phut bao 1 lan (1-240). Them o 'Nghe lenh /baocao trong nhom': go /baocao hoac /bc trong nhom la tool tra bao cao ngay lap tuc (dang chay -> tien do hien tai; khong chay -> tong ket luot gan nhat). Tool chi dung token anh dan, KHONG dung token trong .env Hermes de tranh 409 Conflict voi bot Hermes. Luu tele_offset de mo lai app khong xu ly lap lenh cu. Them tests/test_tele_nhom.py (32 test) va tests/test_tele_hop.py (25 test GUI that).",
   "date": "2026-10-26"
 }
