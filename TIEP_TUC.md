@@ -1,6 +1,6 @@
 # TIẾP TỤC — LightVisual Image Tool
 
-Cập nhật: 2026-10-26 · **v1.0.11** · trạng thái: chạy thật OK với key thật (gói Grok Vô Hạn 1 ngày)
+Cập nhật: 2026-10-26 · **v1.0.12** · trạng thái: chạy thật OK với key thật (gói Grok Vô Hạn 1 ngày)
 
 ## 1. Tool này làm gì
 Tạo ảnh hàng loạt qua API lightvisual.studio (`POST /v1/images/generations`),
@@ -131,7 +131,7 @@ Test cũ chỉ đếm **tổng số MP4** nên không bắt được.
 lấy từ toàn bộ nội dung (hash). Đừng assert test bằng tổng số file — phải assert **file nào nằm
 trong thư mục nào**.
 
-## 5d. Báo cáo tiến độ lên Telegram (v1.0.11)
+## 5d. Báo cáo tiến độ lên Telegram (v1.0.12)
 Nút **📣 Telegram** ở góc phải trên, cạnh `API key`. Mở hộp thoại — **chỉ 2 ô nhập, không quét nhóm**:
 
 1. **Bật báo cáo Telegram** — mặc định TẮT.
@@ -214,5 +214,5 @@ python _sang.py
   (hoặc cứ chạy `run.bat`, tool tự sinh `config.json` rỗng) rồi bấm **API key** dán key.
 - Script tự kiểm: thiếu file bắt buộc → báo `THIEU FILE`; quét regex `LV_…`, `sk-…`, `<id>:<token>`
   → nếu thấy key thật thì in `CANH BAO — có thể lộ key`.
-- Đã kiểm: giải nén zip ra thư mục trống → `python main.py` chạy được, `APP_VERSION = 1.0.11`,
+- Đã kiểm: giải nén zip ra thư mục trống → `python main.py` chạy được, `APP_VERSION = 1.0.12`,
   nút Telegram hiện, hộp thoại mở OK, 4 bộ test 19/90/26/9 đều PASS.

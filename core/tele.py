@@ -449,6 +449,12 @@ class TheoDoi(object):
         ok, me = get_me(self.token)
         if ok:
             self.bot_username = str(me.get("username") or "")
+            # Privacy mode BẬT -> Telegram chỉ gửi lệnh dạng /baocao@<bot>, lệnh
+            # trần "/baocao" bị chặn. Phải nói rõ để anh không tưởng tool hỏng.
+            if not me.get("can_read_all_group_messages"):
+                self.log("Telegram: bot đang BẬT chế độ riêng tư nên chỉ nhận lệnh "
+                         "dạng /baocao@%s. Muốn gõ /baocao trần: BotFather -> "
+                         "/setprivacy -> chọn bot -> Disable." % self.bot_username)
         self._t = threading.Thread(target=self._loop)
         self._t.daemon = True
         self._t.start()

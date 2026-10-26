@@ -1,4 +1,4 @@
 {
-  "version": "1.0.11",
-  "notes": "1.0.11: Sua 409 Conflict khi bat/tat/bat lai bao cao Telegram. TheoDoi.dung() gio cho long-poll nha ket noi (toi 45s) va tra True/False; main._dung_theo_doi() chi dat self.td=None khi luong da tat han; _bat_theo_doi() khong mo luong moi neu luong cu con treo -> khong con 2 luong cung getUpdates. Giu nguyen: hop thoai chi 2 o (bot token + ID nhom), mac dinh 30 phut/lan, lenh /baocao tra ngay, log ten+ID nhom moi thay. Test: 26 + 34 + 24 + 9 + 90 + 19 + 7 PASS."
+  "version": "1.0.12",
+  "notes": "1.0.12: Them canh bao khi bot bat che do rieng tu (can_read_all_group_messages=False) - Telegram khong gui lenh /baocao tran vao nhom, phai go /baocao@<ten_bot> hoac tat privacy trong BotFather. Truoc day tool im lang khong bao gi nen tuong hong. Giu nguyen 1.0.11 (fix 409 khi bat/tat/bat lai)."
 }
