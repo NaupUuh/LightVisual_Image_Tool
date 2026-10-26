@@ -179,8 +179,36 @@ Ghi chú kỹ thuật:
 - **Nhiều bot / nhiều máy:** mỗi máy 1 token riêng + cùng ID nhóm = OK, không 409.
   Mỗi token chỉ 1 chương trình `getUpdates`; 2 tool cùng token (dù khác máy) → 409.
 - `tele_offset` (update_id cuối) lưu trong `config.json` để mở lại app không xử lý lặp lệnh cũ.
-- Test: `tests/test_tele_nhom.py` (34) + `tests/test_tele_hop.py` (24: hộp thoại token + ID nhóm,
+- Test: `tests/test_tele_nhom.py` (35) + `tests/test_tele_hop.py` (24: hộp thoại token + ID nhóm,
   đọc link/@kenh/ID dương, ID sai không lưu, `/baocao` trả lời).
+
+## 5e. Nối thêm việc khi tool ĐANG CHẠY (v1.0.15)
+Nút **➕ Nối vào hàng chờ (đang chạy)** ở đáy cửa sổ (cạnh `Nạp lại`). Nút **luôn bấm được** —
+bấm lúc chưa chạy thì tool nhắc *"Chưa có lượt nào đang chạy"*. Khi đang chạy, tool đọc **đúng
+phần đang chọn trên màn hình lúc bấm** rồi **nối vào hàng chờ của lượt đang chạy** (tab 4);
+các luồng đang chạy nhận việc mới **ngay**, không cần dừng tool.
+
+Hai cách dùng chính (đang ở tab 2):
+1. **Chỉ prompt video** — thêm dòng vào ô `2. PROMPT VIDEO` → bấm nút → prompt MỚI được nối
+   vào hàng chờ và chạy tiếp ngay sau việc đang làm.
+2. **Folder ảnh tham chiếu** — chọn **folder khác** ở ô folder → bấm nút → mọi ảnh trong folder
+   đó thành việc mới; **mỗi tên folder vào = 1 thư mục con** ở thư mục ra; ảnh dùng xong vẫn bị xoá.
+
+Quy tắc (đã kiểm chứng):
+- **Chống nạp trùng**: khoá = prompt gốc + ảnh khung + prompt ảnh + lần + tên folder. Bấm 2 lần
+  cùng dữ liệu → lần 2 báo *"không có prompt/ảnh nào mới"*.
+- **Theo tab đang mở**: tab 2 = việc video, tab 1 = việc tạo ảnh, tab 3 = việc sửa ảnh.
+  **Nối chéo được** (đang chạy lượt ảnh vẫn nối được việc video vào cùng hàng chờ) vì mỗi việc
+  tự nhớ loại của nó ở khoá `_loai`, worker dispatch theo từng việc.
+- Việc nối thêm dùng **model/giây/res/tỉ lệ đang chọn trên GUI lúc bấm**; thư mục ra + bảng
+  thư mục con (`thu_muc_folder` / `thu_muc_prompt`) thì **dùng chung với lượt đang chạy**.
+- Nguồn `ảnh khung` / `prompt ảnh` cũng nối được; thiếu đầu vào → báo rõ, không chạy sai.
+- Nút hiện **✔ Đã nối N việc** trong 4 giây rồi trở lại bình thường.
+- Nếu **tất cả luồng đã thoát** (hàng chờ vừa cạn) mà anh nối thêm → tool **tự mở lại luồng**.
+- **Cẩn thận đã gặp**: bấm CHẠY ở chế độ ảnh thì tool **tự nhảy sang tab 3** → nếu lượt đang chạy
+  là lượt ẢNH mà tab đang mở là tab 3 thì giữ đúng chế độ của lượt (tránh đọc nhầm ô prompt sửa ảnh).
+- Test: `_test_tab2.py` (đúng 2 tình huống trên), `_test_cross.py` (nối chéo ảnh↔video),
+  `_test_vnoi.py`, `_test_fnoi.py`, `_test_uv.py`, `_test_noi4.py`, `_test_nut_idle.py`.
 
 ## 6. Việc còn lại
 1. Gói hiện tại chỉ **1 ngày / 1 luồng** → muốn nhiều luồng song song thật thì nâng gói hoặc thêm nhiều key.

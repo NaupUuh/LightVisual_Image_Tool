@@ -1,4 +1,4 @@
 {
-  "version": "1.0.14",
-  "notes": "v1.0.14: go '/' la hien menu lenh (/baocao, /trangthai, /giup) de bam chon; them lenh /trangthai va /giup; bot nao go @bot do. v1.0.13: fix 409 lam tat luong nghe vinh vien -> thu lai 5 lan."
+  "version": "1.0.15",
+  "notes": "v1.0.15: nut 'Noi vao hang cho' — dang chay them prompt/folder moi la noi thang vao hang cho cua luot dang chay, khong can dung tool; doc dung nguon dang chon tren GUI (ke ca doi nguon giua chung), chong nap trung, noi cheo anh <-> video. v1.0.14: go '/' hien menu lenh (/baocao, /trangthai, /giup). v1.0.13: fix 409 lam tat luong nghe vinh vien -> thu lai 5 lan."
 }

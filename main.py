@@ -19,7 +19,7 @@ import traceback
 import webbrowser
 from tkinter import filedialog, messagebox, ttk
 
-APP_VERSION = "1.0.14"
+APP_VERSION = "1.0.15"
 APP_TEN = "LightVisual Image Tool"
 
 THU_MUC_GOC = os.path.dirname(os.path.abspath(__file__))
@@ -128,6 +128,12 @@ class App(tk.Tk):
         # lượt chạy để dừng → tiếp tục / nạp lại
         self._lan_chay = None      # {"loai","cau_hinh","viec","so_luong"}
         self._da_xong = set()      # stt đã OK trong lượt này
+        # nối thêm việc vào hàng chờ khi đang chạy
+        self._hang_cho_khoa = set()   # khoá việc đã nằm trong lượt này
+        self._stt_cuoi = 0
+        self._q_luot = None
+        self._so_worker = 0
+        self._wk_lock = threading.Lock()
         self._the_he = 0           # mỗi lượt 1 thế hệ; worker cũ tự thoát
         self._dang_lam = 0         # số việc luồng đang thực sự chạy
         self._dem_lock = threading.Lock()
@@ -1256,6 +1262,10 @@ class App(tk.Tk):
         self.btn_nap = ttk.Button(d, text="Nạp lại", command=self._bam_nap_lai,
                                   state="disabled", width=10)
         self.btn_nap.grid(row=0, column=4, rowspan=2, padx=(6, 0), sticky="ns")
+        self._ten_nut_noi = "➕ Nối vào hàng chờ (đang chạy)"
+        self.btn_noi = ttk.Button(d, text=self._ten_nut_noi,
+                                  command=self._noi_hang_cho, width=24)
+        self.btn_noi.grid(row=0, column=5, rowspan=2, padx=(6, 0), sticky="ns")
 
         self.pb = ttk.Progressbar(d, style="Horizontal.TProgressbar", maximum=100, value=0)
         self.pb.grid(row=0, column=1, sticky="ew", padx=12)
@@ -1966,6 +1976,7 @@ class App(tk.Tk):
         cau_hinh = {
             "model": model, "giay": giay, "res": res, "aspect": aspect,
             "thu_muc": thu_muc, "mo_khi_xong": bool(self.var_vmo.get()),
+            "nguon": nguon,
         }
 
         viec = []
@@ -2035,6 +2046,7 @@ class App(tk.Tk):
                 ban_do[d["ten"]] = self._tao_thu_muc_folder(thu_muc, k + 1, d["ten"])
             for v in viec:
                 v["thu_muc"] = ban_do.get(v.get("folder_vao")) or thu_muc
+            cau_hinh["thu_muc_folder"] = ban_do
             self._log("Chia %d video vào %d thư mục con (theo tên folder ảnh đầu vào):" %
                       (len(viec), len(ban_do)))
             for d in ds_don_vi:
@@ -2046,6 +2058,7 @@ class App(tk.Tk):
                 ban_do[g] = self._tao_thu_muc_prompt(thu_muc, k + 1, g)
             for v in viec:
                 v["thu_muc"] = ban_do[v.get("prompt_goc") or v["prompt"]]
+            cau_hinh["thu_muc_prompt"] = ban_do
             self._log("Chia %d video vào %d thư mục con (mỗi prompt 1 thư mục):" %
                       (len(viec), len(ds_goc)))
             for g in ds_goc:
@@ -2073,6 +2086,15 @@ class App(tk.Tk):
 
     def _worker_key(self, loai, key, the_he, q):
         """1 luồng = 1 API key. Luồng cũ tự thoát khi sang lượt mới."""
+        with self._wk_lock:
+            self._so_worker += 1
+        try:
+            self._vong_worker(loai, key, the_he, q)
+        finally:
+            with self._wk_lock:
+                self._so_worker -= 1
+
+    def _vong_worker(self, loai, key, the_he, q):
         while True:
             if the_he != self._the_he:
                 return
@@ -2084,12 +2106,13 @@ class App(tk.Tk):
                 continue
             if v is None:
                 return
+            lo = v.get("_loai") or loai        # việc nối chéo ảnh/video giữ đúng loại
             if self.dung_co or the_he != self._the_he:
                 self._dem_dung()
-                self.ui_q.put(("dung_dong", (loai, iid, v, ch)))
+                self.ui_q.put(("dung_dong", (lo, iid, v, ch)))
                 continue
             try:
-                if loai == "anh":
+                if lo == "anh":
                     key = self._lam_mot(iid, v, ch, key, the_he)
                 else:
                     key = self._lam_video(iid, v, ch, key, the_he)
@@ -2381,6 +2404,314 @@ class App(tk.Tk):
         except AttributeError:
             pass
 
+    # ------------------------------------------------ nối thêm việc khi đang chạy
+    def _bat_nut_noi(self):
+        """Nút Nối LUÔN bấm được — bấm lúc chưa chạy sẽ được giải thích rõ."""
+        try:
+            self.btn_noi.configure(state="normal", text=self._ten_nut_noi)
+        except AttributeError:
+            pass
+
+    def _tat_nut_noi(self):
+        try:
+            self.btn_noi.configure(state="normal", text=self._ten_nut_noi)
+        except AttributeError:
+            pass
+
+    @staticmethod
+    def _khoa_viec(v):
+        """Khoá nhận diện 1 việc — dùng để không nối trùng."""
+        return (str(v.get("prompt_goc") or v.get("prompt") or ""),
+                str(v.get("khung") or ""),
+                str(v.get("prompt_anh") or ""),
+                int(v.get("lan") or 1),
+                str(v.get("folder_vao") or ""))
+
+    def _nguon_dang_chon(self):
+        """Nguồn cảnh đầu đang chọn trên GUI (tab 2)."""
+        try:
+            return self.cb_vnguon.get() or api.DS_NGUON[0]
+        except Exception:
+            return api.DS_NGUON[0]
+
+    def _che_do_chon_luc_bam(self, ch):
+        """Chế độ tạo ảnh / sửa ảnh cho việc nối thêm — theo tab anh đang mở.
+
+        Lưu ý: bấm CHẠY ở chế độ ảnh thì tool TỰ nhảy sang tab 3 (Sửa ảnh) —
+        nên nếu lượt đang chạy là lượt ẢNH và tab đang mở là tab 3 thì giữ đúng
+        chế độ của lượt (tránh đọc nhầm ô prompt sửa ảnh).
+        """
+        try:
+            chi_so = self.nb.index(self.nb.select())
+        except Exception:
+            chi_so = -1
+        if chi_so == 0:                     # tab 1: tạo ảnh hàng loạt
+            return False
+        if chi_so == 2:                     # tab 3: sửa ảnh / giữ nhân vật
+            if (self._lan_chay or {}).get("loai") == "anh":
+                return bool(ch.get("che_do_sua"))
+            return True
+        return bool(ch.get("che_do_sua"))   # tab khác -> giữ như lượt đang chạy
+
+    def _ung_vien_noi(self, loai, ch, nguon=None, che_do_sua=None):
+        """Đọc đầu vào HIỆN TẠI trên GUI -> danh sách việc (chưa có stt).
+
+        Đọc theo CHẾ ĐỘ ANH ĐANG CHỌN lúc bấm nút, KHÔNG theo cấu hình của lượt
+        đang chạy — nhờ vậy đang chạy nguồn này vẫn nối được việc của nguồn khác
+        (vd: đang chạy prompt video, chọn folder ảnh tham chiếu khác rồi bấm nối).
+        """
+        ra = []
+        if loai == "anh":
+            # bấm CHẠY xong tool tự nhảy tab -> không dựa vào tab đang mở
+            if che_do_sua is None:
+                che_do_sua = bool(ch.get("che_do_sua"))
+            if che_do_sua:
+                ds_p = [t.strip() for t in
+                        self.txt_prompt_sua.get("1.0", "end").splitlines()
+                        if t.strip() and not t.strip().startswith("#")]
+            else:
+                ds_p = self._ds_prompt()
+            try:
+                moi = max(1, min(4, int(self.sp_n.get() or 1)))
+            except Exception:
+                moi = 1
+            for p in ds_p:
+                for j in range(1, moi + 1):
+                    ra.append({"prompt": p, "khung": "", "prompt_anh": "",
+                               "lan": j, "moi": moi, "nguon": ""})
+            return ra
+
+        nguon = nguon or self._nguon_dang_chon()
+        try:
+            moi = max(1, min(50, int(self.sp_vmoi.get() or 1)))
+        except Exception:
+            moi = 1
+        if nguon == api.DS_NGUON[1]:                      # ảnh khung -> video
+            for pk in self._ds_anh_khung():
+                for j in range(1, moi + 1):
+                    ra.append({"prompt": "", "khung": pk, "prompt_anh": "", "lan": j,
+                               "moi": moi, "nhan": os.path.basename(pk), "nguon": nguon})
+        elif nguon == api.DS_NGUON[2]:                    # prompt ảnh -> ảnh -> video
+            for pa in self._ds_prompt_anh():
+                for j in range(1, moi + 1):
+                    ra.append({"prompt": "", "khung": "", "prompt_anh": pa, "lan": j,
+                               "moi": moi, "nhan": pa[:40], "nguon": nguon})
+        elif nguon == api.DS_NGUON[3]:                    # folder ảnh tham chiếu
+            ds_pv = self._ds_prompt_video()
+            k = 0
+            for d in self._ds_don_vi_tham_chieu():
+                p_dv = d["prompt"] or (ds_pv[k % len(ds_pv)] if ds_pv else "")
+                k += 1
+                for pk in d["anh"]:
+                    ra.append({"prompt": p_dv, "khung": pk, "prompt_anh": "", "lan": 1,
+                               "moi": 1, "nhan": os.path.basename(pk),
+                               "folder_vao": d["ten"], "nguon": nguon,
+                               "xoa_sau": bool(self.var_xtc.get())})
+        else:                                             # chỉ prompt video
+            for p in self._ds_prompt_video():
+                for j in range(1, moi + 1):
+                    ra.append({"prompt": p, "khung": "", "prompt_anh": "", "lan": j,
+                               "moi": moi, "nhan": "", "nguon": nguon})
+        return ra
+
+    def _loai_theo_tab(self, ch):
+        """Loại việc theo TAB đang mở lúc bấm nối: tab 2 = video, tab 1/3 = ảnh."""
+        try:
+            chi_so = self.nb.index(self.nb.select())
+        except Exception:
+            chi_so = -1
+        if chi_so == 1:
+            return "video"
+        if chi_so in (0, 2):
+            return "anh"
+        return self._lan_chay.get("loai") or "anh"
+
+    def _cau_hinh_noi(self, loai, ch):
+        """Cấu hình cho việc nối thêm: lấy model/thông số ĐANG CHỌN trên GUI,
+        giữ thư mục ra + bảng thư mục con + mở-folder-khi-xong của lượt đang chạy."""
+        c = dict(ch)
+        if loai == "video":
+            try:
+                c["giay"] = max(1, min(15, int(self.sp_vsec.get())))
+            except Exception:
+                pass
+            c["model"] = self._model_video_dang_chon()
+            c["res"] = self.cb_vres.get()
+            c["aspect"] = self.cb_vaspect.get()
+            c["nguon"] = self._nguon_dang_chon()
+        else:
+            try:
+                c["moi"] = max(1, min(4, int(self.sp_n.get() or 1)))
+            except Exception:
+                pass
+            c["model"] = self._model_dang_chon()
+            c["aspect"] = self.cb_aspect.get()
+            c["resolution"] = self.cb_res.get()
+            c["quality"] = self.cb_quality.get()
+            c["che_do_sua"] = bool(self._che_do_chon_luc_bam(ch))
+            c["ds_anh"] = self._ds_anh_gui() if c["che_do_sua"] else []
+        return c
+
+    def _noi_hang_cho(self):
+        """Nối prompt/ảnh MỚI vào hàng chờ của lượt đang chạy (tab 4)."""
+        if not self.dang_chay or not self._lan_chay:
+            messagebox.showinfo(APP_TEN, "Chưa có lượt nào đang chạy.\n"
+                                         "Bấm CHẠY trước, rồi mới nối thêm.")
+            return
+        ch_goc = self._lan_chay.get("cau_hinh") or {}
+        q = self._q_luot
+        if q is None:
+            messagebox.showinfo(APP_TEN, "Lượt chạy này không nhận thêm việc.")
+            return
+
+        # loại việc = theo tab đang mở (nối chéo ảnh <-> video vẫn đúng loại)
+        loai = self._loai_theo_tab(ch_goc)
+        nguon = None
+        che_do_sua = None
+        if loai == "video":
+            nguon = self._nguon_dang_chon()
+            if nguon == api.DS_NGUON[3]:
+                p_tc = self.e_thamchieu.get().strip()
+                if not p_tc or not os.path.isdir(p_tc):
+                    messagebox.showwarning(APP_TEN, "Nguồn 'folder ảnh tham chiếu' "
+                                                    "nhưng chưa chọn folder hợp lệ.")
+                    return
+            elif nguon == api.DS_NGUON[1] and not self._ds_anh_khung():
+                messagebox.showwarning(APP_TEN, "Nguồn 'ảnh khung' nhưng danh sách ảnh khung "
+                                                "đang trống.")
+                return
+            elif nguon == api.DS_NGUON[2] and not self._ds_prompt_anh():
+                messagebox.showwarning(APP_TEN, "Nguồn 'prompt ảnh' nhưng ô '1. PROMPT ẢNH' "
+                                                "đang trống.")
+                return
+        else:
+            che_do_sua = self._che_do_chon_luc_bam(ch_goc)
+            if che_do_sua and not self._ds_anh_gui():
+                messagebox.showwarning(APP_TEN, "Chế độ sửa ảnh nhưng chưa có ảnh gửi kèm (tab 3).")
+                return
+
+        them = []
+        trong = 0
+        for v in self._ung_vien_noi(loai, ch_goc, nguon=nguon, che_do_sua=che_do_sua):
+            if loai == "video" and not (v.get("prompt") or "").strip():
+                trong += 1
+                continue
+            k = self._khoa_viec(v)
+            if k in self._hang_cho_khoa:
+                continue
+            self._hang_cho_khoa.add(k)
+            v["_loai"] = loai
+            them.append(v)
+        if trong:
+            self._log("Bỏ qua %d việc không có prompt." % trong)
+        if not them:
+            self._log("Nối hàng chờ: không có prompt/ảnh nào mới (đều đã nằm trong lượt này).")
+            return
+
+        # cấu hình riêng cho các việc nối thêm (theo GUI lúc bấm), giữ nguyên
+        # thư mục ra + bảng thư mục con của lượt đang chạy
+        ch = self._cau_hinh_noi(loai, ch_goc)
+
+        if loai == "video":
+            ds_mc = self._ds_mc()
+            pool = []
+            for v in them:
+                if ds_mc:
+                    if not pool:
+                        pool = list(ds_mc)
+                        random.shuffle(pool)
+                    v["mc"] = pool.pop()
+                else:
+                    v["mc"] = ""
+                g = v.get("prompt") or ""
+                v["prompt_goc"] = g
+                if v["mc"]:
+                    v["prompt"] = self._ghep_mc(v["mc"], g)
+
+            co_folder = any(v.get("folder_vao") for v in them)
+            bdo_f = ch.get("thu_muc_folder")
+            bdo_p = ch.get("thu_muc_prompt")
+            if co_folder:
+                if bdo_f is None:                 # lượt đang chạy chưa chia theo folder
+                    bdo_f = {}
+                    ch["thu_muc_folder"] = bdo_f
+                    ch_goc["thu_muc_folder"] = bdo_f
+                for v in them:
+                    t = v.get("folder_vao") or ""
+                    if t and t not in bdo_f:
+                        bdo_f[t] = self._tao_thu_muc_folder(ch["thu_muc"], len(bdo_f) + 1, t)
+                        self._log("   thư mục mới: %s" % os.path.basename(bdo_f[t]))
+                    v["thu_muc"] = bdo_f.get(t) or ch["thu_muc"]
+            else:
+                ds_goc = []
+                for v in them:
+                    g = v.get("prompt_goc") or ""
+                    if g not in ds_goc:
+                        ds_goc.append(g)
+                if bdo_p is not None or len(ds_goc) > 1:
+                    if bdo_p is None:
+                        bdo_p = {}
+                        ch["thu_muc_prompt"] = bdo_p
+                        ch_goc["thu_muc_prompt"] = bdo_p
+                    for v in them:
+                        g = v.get("prompt_goc") or ""
+                        if g not in bdo_p:
+                            bdo_p[g] = self._tao_thu_muc_prompt(ch["thu_muc"], len(bdo_p) + 1, g)
+                            self._log("   thư mục mới: %s" % os.path.basename(bdo_p[g]))
+                        v["thu_muc"] = bdo_p[g]
+        else:
+            for v in them:
+                v["mc"] = ""
+                v["thu_muc"] = ch["thu_muc"]
+
+        nhan = self._nhan(loai, ch)
+        for v in them:
+            self._stt_cuoi += 1
+            v["stt"] = self._stt_cuoi
+            iid = self._iid(loai, v["stt"])
+            try:
+                self.tree.delete(iid)
+            except tk.TclError:
+                pass
+            self.tree.insert("", "end", iid=iid,
+                             values=(v["stt"], (v.get("prompt") or "")[:110],
+                                     nhan, "chờ", "", ""),
+                             tags=("dang",))
+            try:
+                self.tree.see(iid)
+            except tk.TclError:
+                pass
+            q.put((iid, v, ch))
+        self._lan_chay["viec"].extend(them)
+
+        with self._dem_lock:
+            self._dem["tong"] += len(them)
+            d = dict(self._dem)
+        self._cap_nhat_dem(d)
+
+        # lỡ tất cả luồng đã thoát (hàng chờ vừa cạn) -> mở lại luồng
+        with self._wk_lock:
+            song = self._so_worker
+        if song <= 0:
+            keys = self._ds_key() or [""]
+            for k in keys:
+                threading.Thread(target=self._worker_key,
+                                 args=(loai, k, self._the_he, q), daemon=True).start()
+            self._log("Hàng chờ cạn nên luồng đã thoát — mở lại %d luồng." % len(keys))
+
+        try:                                # phản hồi ngay trên nút, khỏi mò sang tab 4
+            self.btn_noi.configure(text="✔ Đã nối " + str(len(them)) + " việc")
+            self.after(4000, lambda: self.btn_noi.configure(
+                text=self._ten_nut_noi, state="normal"))
+        except Exception:
+            pass
+        if loai == "video":
+            nhan_nguon = nguon or api.DS_NGUON[0]
+        else:
+            nhan_nguon = "sửa ảnh" if che_do_sua else "tạo ảnh"
+        self._log("➕ Nối %d việc (%s) vào hàng chờ — tổng %d. Luồng đang chạy nhận ngay."
+                  % (len(them), nhan_nguon, d["tong"]))
+
     def _chay_luot(self, loai, viec, cau_hinh, da_xong=None):
         """1 lượt chạy: mỗi API key = 1 luồng chạy song song."""
         da_xong = set(da_xong or ())
@@ -2397,14 +2728,20 @@ class App(tk.Tk):
         self.btn_dung.configure(state="normal")
         self.btn_tiep.configure(state="disabled")
         self.btn_nap.configure(state="disabled")
+        self._bat_nut_noi()
 
         q = queue.Queue()      # queue riêng mỗi lượt: luồng lượt cũ không giành được việc mới
         self._q_luot = q
+        self._hang_cho_khoa = set()
+        with self._wk_lock:
+            self._so_worker = 0
         with self._dem_lock:
             self._dem = {"ok": len(da_xong), "loi": 0, "dung": 0, "tong": len(viec)}
         nhan = self._nhan(loai, cau_hinh)
 
+        self._stt_cuoi = max([v["stt"] for v in viec] or [0])
         for v in viec:
+            self._hang_cho_khoa.add(self._khoa_viec(v))
             iid = self._iid(loai, v["stt"])
             try:
                 self.tree.delete(iid)
@@ -2460,6 +2797,7 @@ class App(tk.Tk):
             return
         self.dung_co = True
         self._luu_tt()
+        self._tat_nut_noi()
         self._log("Đang dừng… các luồng sẽ nhả việc đang chạy. "
                   "Bấm 'Tiếp tục' để chạy tiếp phần còn lại.")
         self.btn_dung.configure(state="disabled")
@@ -2518,6 +2856,7 @@ class App(tk.Tk):
         self.dang_chay = False
         self.btn_chay.configure(state="normal")
         self.btn_dung.configure(state="disabled")
+        self._tat_nut_noi()
         d = self._dem
         giay = time.time() - self._t0
         con = len(self._lan_chay["viec"]) - len(self._da_xong) if self._lan_chay else 0

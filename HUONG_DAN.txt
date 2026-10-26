@@ -116,6 +116,20 @@ Group privacy ON thì dùng `/baocao@<username_bot>`.
 `409 Conflict` → token đó đang bị chương trình khác đọc (vd bot Hermes). Tạo bot riêng
 cho tool bằng **@BotFather** (`/newbot`) rồi dán token mới — đừng dùng token của bot khác.
 
+## 6c. Thêm việc khi tool ĐANG CHẠY (không cần dừng)
+
+Nút **➕ Nối vào hàng chờ (đang chạy)** ở đáy cửa sổ (cạnh `Nạp lại`). Tool đọc đúng
+phần anh đang chọn trên màn hình lúc bấm rồi **nối vào hàng chờ của lượt đang chạy**:
+
+- Đang ở **tab 2** + nguồn **"Chỉ prompt video"**: thêm dòng vào ô PROMPT VIDEO rồi bấm nút.
+- Đang ở **tab 2** + nguồn **"Folder ảnh tham chiếu"** và **chọn folder khác**: bấm nút —
+  mỗi ảnh thành 1 video, mỗi folder vào = 1 thư mục ra, ảnh dùng xong bị xoá.
+- Đang ở **tab 1**: nối prompt tạo ảnh · **tab 3**: nối prompt sửa ảnh.
+  Nối chéo cũng được (đang chạy lượt ảnh vẫn nối được việc video vào cùng hàng chờ).
+
+Việc nào đã có trong lượt thì **không nạp trùng**. Bấm nút lúc tool rảnh sẽ được nhắc
+*"Chưa có lượt nào đang chạy"*. Nút hiện **✔ Đã nối N việc** vài giây cho biết đã ăn.
+
 ## 7. Lỗi thường gặp
 
 | Hiện tượng | Nguyên nhân / cách xử lý |
