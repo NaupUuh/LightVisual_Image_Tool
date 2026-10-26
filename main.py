@@ -1522,7 +1522,15 @@ class App(tk.Tk):
                     return
                 off = int(self.cfg.get("tele_offset") or 0)
                 ds, off2, loi = tele.lay_nhom(tok, giay=8.0, offset=off)
-                self.cfg["tele_offset"] = off2
+                # không thấy nhóm nào mà offset đang > 0 (các update cũ đã bị
+                # đánh dấu đã đọc) -> quét lại từ đầu để bắt sự kiện add bot
+                if not ds and off > 0:
+                    ds2, off3, loi2 = tele.lay_nhom(tok, giay=6.0, offset=0)
+                    if ds2:
+                        ds = ds2
+                    off2 = max(off2, off3)
+                    loi = loi or loi2
+                self.cfg["tele_offset"] = max(int(off2 or 0), off)
                 self.ui_q.put(("tele_nhom", (True, me.get("username") or "", ds, loi)))
             threading.Thread(target=chay, daemon=True).start()
 
