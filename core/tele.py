@@ -111,10 +111,12 @@ def goi(token, method, tham_so=None, timeout=25):
         return False, "chưa có bot token"
     url = API_GOC % (token, method)
     data = None
-    if tham_so:
+    # tham_so=None -> GET; tham_so={} (dict rỗng) vẫn phải POST, nếu không
+    # máy chủ/proxy có thể trả 501 Unsupported method.
+    if tham_so is not None:
         data = json.dumps(tham_so).encode("utf-8")
     req = urllib.request.Request(url, data=data)
-    if data:
+    if data is not None:
         req.add_header("Content-Type", "application/json")
     try:
         with urllib.request.urlopen(req, timeout=timeout) as r:
@@ -142,6 +144,7 @@ def dat_lenh(token, ds=None):
     ds = ds or [
         {"command": "baocao", "description": "Báo cáo tiến độ ngay"},
         {"command": "trangthai", "description": "Đang chạy hay đang rảnh"},
+        {"command": "tonghop", "description": "Cả nhóm cùng báo cáo (mọi máy)"},
         {"command": "giup", "description": "Hướng dẫn dùng bot"},
     ]
     sach = []
@@ -169,7 +172,8 @@ def lay_lenh(token):
 
 def get_me(token):
     """Trả (ok, {'username':..., 'id':...} | lỗi)."""
-    ok, kq = goi(token, "getMe", None, timeout=15)
+    # gửi POST ({} = có body) để chắc chắn qua được mọi cấu hình mạng/proxy
+    ok, kq = goi(token, "getMe", {}, timeout=15)
     if not ok:
         return False, kq
     if not isinstance(kq, dict):
@@ -302,7 +306,26 @@ def la_lenh_baocao(text, bot_username=""):
         if bot_username and ai.strip().lower() != bot_username.strip().lower():
             return False
         phan = ten
-    return phan.strip().lower() in ("baocao", "bc", "report")
+    phan = phan.strip().lower()
+    return phan in ("baocao", "bc", "report")
+
+
+def la_lenh_tonghop(text, bot_username=""):
+    """True nếu text là /tonghop@<bot> — nhờ CẢ NHÓM báo cáo (mỗi máy tự trả lời).
+
+    Giữ riêng khỏi `lenh_nao` để không đổi hợp đồng của hàm cũ (test cũ đang
+    khẳng định lenh_nao('/bc') == 'bc').
+    """
+    t = (text or "").strip()
+    if not t.startswith("/"):
+        return False
+    phan = t.split()[0][1:]
+    if "@" in phan:
+        ten, _, ai = phan.partition("@")
+        if bot_username and ai.strip().lower() != bot_username.strip().lower():
+            return False
+        phan = ten
+    return phan.strip().lower() in ("tonghop", "tổng hợp", "tong_hop")
 
 
 def lenh_nao(text, bot_username=""):
@@ -408,9 +431,10 @@ class BaoCao(object):
         if not self.enabled or self._t:
             return False
         self._lan_gui = time.time()     # tin tiến độ đầu tiên phải chờ đủ moi_giay
-        # không daemon: khi thoát app, tiến trình chờ gửi nốt tin kết thúc trong hàng đợi
+        # PHẢI daemon: nếu không, khi đóng tool tiến trình Python vẫn chờ luồng này
+        # gửi xong (mỗi lần gửi timeout 20s) -> cửa sổ đóng mà tool còn treo.
         self._t = threading.Thread(target=self._loop)
-        self._t.daemon = False
+        self._t.daemon = True
         self._t.start()
         return True
 
@@ -420,6 +444,10 @@ class BaoCao(object):
         t = self._t
         if t and t.is_alive():
             t.join(timeout=cho)
+
+    def dung_nhanh(self):
+        """Báo dừng nhưng KHÔNG chờ. Dùng khi đóng tool để GUI không đứng hình."""
+        self._stop.set()
 
     # -- đưa tin vào hàng đợi
     def _dat(self, text, ngay, chat_ids=None):
@@ -531,6 +559,14 @@ class TheoDoi(object):
         self._t.start()
         return True
 
+    def dung_nhanh(self):
+        """Báo dừng nhưng KHÔNG join — gọi trên luồng GUI lúc đóng tool.
+
+        Long-poll getUpdates có thể đang giữ kết nối tới 40s; join trên luồng GUI
+        sẽ làm cửa sổ đứng hình. Luồng là daemon nên tiến trình vẫn thoát được.
+        """
+        self._stop.set()
+
     def dung(self, cho=45.0):
         """Dừng long-poll. Phải chờ đủ lâu: Telegram giữ request tới `timeout` giây,
         nếu bật lại trước khi luồng cũ nhả kết nối thì 2 luồng cùng getUpdates
@@ -601,6 +637,15 @@ class TheoDoi(object):
                 if not self.khi_lenh:
                     continue
                 txt = text_cua_update(up)
+                # /tonghop -> mọi bot trong nhóm cùng báo cáo (ai có mặt thì trả lời)
+                if la_lenh_tonghop(txt, self.bot_username):
+                    cid = str((c or {}).get("id") or "")
+                    if cid and str((c or {}).get("type")) in LOAI_NHOM and self.khi_lenh:
+                        try:
+                            self.khi_lenh(cid, ten_nhom(c))
+                        except Exception:
+                            pass
+                    continue
                 lenh = lenh_nao(txt, self.bot_username)
                 if not lenh:
                     continue

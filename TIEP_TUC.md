@@ -253,3 +253,55 @@ python _sang.py
   → nếu thấy key thật thì in `CANH BAO — có thể lộ key`.
 - Đã kiểm: giải nén zip ra thư mục trống → `python main.py` chạy được, `APP_VERSION = 1.0.13`,
   nút Telegram hiện, hộp thoại mở OK, 4 bộ test 19/90/26/9 đều PASS.
+
+## 5f. v1.0.17 — tắt tool không treo + báo cáo định kỳ
+
+### Nguyên nhân treo khi tắt (đã đo, không đoán)
+1. `BaoCao._t.daemon = False` → tiến trình Python **chờ luồng gửi tin** (mỗi tin
+   timeout 20s, hàng đợi tới 200 tin) → cửa sổ đóng nhưng tool còn sống.
+2. `_thoat_app` gọi `bc.dung(cho=...)` **join trên luồng GUI** → cửa sổ đứng hình.
+3. `TheoDoi.dung(cho=45)` join long-poll 25–40s trên luồng GUI → treo tới 45s.
+
+### Cách sửa
+- `BaoCao.bat_dau_worker()`: `self._t.daemon = True`.
+- `_thoat_app`: `after_cancel(self._aid)` (huỷ watchdog) → `bc.dung(cho=2.0)` →
+  `_dung_theo_doi(nhanh=True)` (**chỉ báo dừng, KHÔNG join**) → `destroy()`.
+- `TheoDoi.dung_nhanh()`: chỉ `_stop.set()`; luồng là daemon nên tiến trình thoát được.
+
+### Đo thật (app thật, cửa sổ thật, bấm X thật)
+| Trường hợp | Trước | Sau |
+|---|---|---|
+| Đang rảnh, bấm X | tới 45s (join long-poll) | **0.06s** |
+| Đang chạy việc → Dừng → X | treo / phải kill | **0.98s** |
+
+### Báo cáo định kỳ (mới)
+- Watchdog `_giam_sat_nghe` (30s) kiểm tra mốc `_lan_hb`; quá `tele_moi_phut`
+  phút thì gửi `⏱ Báo cáo định kỳ` tới **mọi nhóm** — **kể cả khi tool đang rảnh**.
+- Nếu trong kỳ vừa rồi đã có tin báo cáo nào gửi đi (`bc.da_gui` tăng) thì **bỏ**
+  tin định kỳ → không spam.
+- Mỗi máy chạy 1 bot riêng ⇒ nhóm có N máy thì nhận N tin, mỗi tin có nhãn riêng.
+
+### Lệnh mới
+- `/tonghop` (hoặc `/tonghop@<bot>`): nhờ **cả nhóm** báo cáo — bot nào đang chạy
+  thì bot đó trả lời, không cần biết tên từng bot.
+- `/baocao@<bot>` vẫn như cũ; `/bc`, `/report` là alias.
+
+### Trả lời lệnh khi cửa sổ đã đóng
+`_co_lenh_baocao` gọi thẳng `_gui_bao_cao()` (dữ liệu thuần, không đụng Tk) thay vì
+chỉ đẩy vào `ui_q` — cửa sổ đóng mà tiến trình còn sống vẫn trả lời được.
+
+### Kiểm chứng
+- `tests/test_baocao_ngay.py` — **9 PASS / 0 FAIL** (máy chủ Telegram giả, long-poll thật).
+- `tests/test_dong_app.py` — **14 PASS / 0 FAIL** (đo thời gian tắt, báo cáo định kỳ,
+  ca đang chạy → Dừng → tắt).
+- 8 bộ test cũ: **222 PASS / 0 FAIL**.
+- App thật: mở → 409 từ ngoài (đang long-poll) → bấm X → thoát **0.06s**, cửa sổ biến
+  mất, getUpdates từ ngoài trả `ok` (đã nhả kết nối).
+
+### Cần tránh
+- **KHÔNG** `join()` luồng long-poll trên luồng GUI (Tk sẽ đứng hình tới 45s).
+- **KHÔNG** để luồng gửi tin là non-daemon.
+- **KHÔNG** quên `after_cancel(self._aid)` trước `destroy()` — watchdog sẽ gọi
+  `after()` trên cửa sổ đã huỷ.
+- `goi()` phân biệt `tham_so=None` (GET) và `tham_so={}` (POST) — đừng dùng
+  `if tham_so:` vì `{}` là falsy, `getMe` sẽ thành GET.

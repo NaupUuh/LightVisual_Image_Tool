@@ -152,3 +152,15 @@ LightVisual_Image_Tool\
 ├─ output\              ← ảnh ra mặc định
 └─ tests\               ← test bằng máy chủ giả, không tốn credit
 ```
+
+## 6d. Tắt tool / báo cáo tự động (v1.0.17)
+
+- **Tắt tool**: bấm X là thoát ngay (đo thật 0,06s; trước đây chờ tới 45s).
+  Đang chạy việc mà bấm X → hỏi "Dừng và thoát?" → đồng ý là thoát trong ~1s.
+- **Báo cáo định kỳ**: vào Telegram → bật → đặt "Báo cáo mỗi (phút)" = 30.
+  Cứ 30 phút tool gửi 1 tin tóm tắt (kể cả khi rảnh). Nếu trong 30 phút đó đã
+  có tin báo cáo khác thì bỏ qua, không spam.
+- **`/baocao`**: báo cáo của **chính bot đó** (1 máy).
+- **`/tonghop`**: nhờ **tất cả máy** trong nhóm cùng báo cáo — mỗi máy trả lời 1 tin
+  có nhãn riêng. Dùng khi không nhớ tên bot nào.
+- Cửa sổ tool đã đóng nhưng tiến trình còn sống: bot **vẫn trả lời** `/baocao`.
