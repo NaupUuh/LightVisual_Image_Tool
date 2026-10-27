@@ -1,4 +1,4 @@
 {
-  "version": "1.0.18",
-  "notes": "1.0.18 — Tool TU KIEM TRA quyen bot trong nhom: neu bot chua la admin va privacy mode dang BAT thi Telegram KHONG giao lenh tran /tonghop, /baocao (day la ly do 3 bot im lang). Tool bao ro trong log + gui 1 tin canh bao vao nhom kem cach sua 3 buoc. Nut 'Kiem tra quyen' trong hop thoai Telegram."
+  "version": "1.0.19",
+  "notes": "1.0.19 — Bao cao roi DUNG MOC DONG HO: phut :00 va :30 (khong con 'moi N phut ke tu luc bat tool', nen nhieu may cung nhom se bao cung luc). Dong tien do co them toc do THUC cua nhung phut vua roi: '... 137/240 - Da them 30 video trong 30p' (lay so viec xong hien tai tru so viec xong o moc 30 phut truoc). O nhap nhip doi nhan thanh 'Moc bao cao (phut: 30 = :00/:30)'."
 }

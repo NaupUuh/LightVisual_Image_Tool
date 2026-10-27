@@ -231,6 +231,40 @@ def thanh_tien_do(dem):
     return "%s%s" % ("▰" * day, "▱" * (10 - day))
 
 
+def dinh_dang_phut(giay):
+    """Độ dài cửa sổ thời gian dạng ngắn: 45s / 30p / 1h31p.
+
+    Khác `dinh_dang_giay` ở chỗ bỏ phần giây khi đã ≥ 1 phút — dùng cho câu
+    "Đã thêm N video trong 30p" nên không cần chính xác tới giây.
+    """
+    giay = max(0, int(giay))
+    if giay < 60:
+        return "%ds" % giay
+    phut = int(round(giay / 60.0))
+    if phut < 60:
+        return "%dp" % phut
+    return "%dh%02dp" % (phut // 60, phut % 60)
+
+
+def giay_toi_moc(buoc_phut=30, now=None):
+    """Số giây còn lại tới MỐC ĐỒNG HỒ kế tiếp chia hết cho `buoc_phut`.
+
+    buoc_phut=30 -> mốc :00 và :30; 60 -> :00; 15 -> :00/:15/:30/:45.
+    Khác hẳn kiểu "mỗi N phút kể từ lúc bật": kiểu đó trôi theo giờ mở tool,
+    còn kiểu này luôn rơi đúng mốc để nhiều máy cùng báo 1 lúc.
+    """
+    try:
+        buoc = max(1, int(buoc_phut)) * 60
+    except Exception:
+        buoc = 1800
+    t = now or time.localtime()
+    trong_ngay = t.tm_hour * 3600 + t.tm_min * 60 + t.tm_sec
+    con = buoc - (trong_ngay % buoc)
+    if con <= 0:
+        con += buoc
+    return con
+
+
 # ---------------------------------------------------------------- nhóm / lệnh
 def chat_cua_update(up):
     """Lấy dict chat từ 1 update (message, channel_post, my_chat_member…)."""

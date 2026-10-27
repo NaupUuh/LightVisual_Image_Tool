@@ -121,22 +121,42 @@ def main():
     kiem("nhớ username vào config", app.cfg.get("tele_bot_user") == "bao_cao_page_aq_bot",
          str(app.cfg.get("tele_bot_user")))
 
-    # ---- bao cao dinh ky (gia lap da qua 30 phut)
+    # ---- bao cao theo MOC DONG HO (:00 / :30) — gia lap da toi moc
     truoc = len(TRANG["tin"])
-    app._lan_hb = time.time() - 31 * 60
-    app._giam_sat_nghe()
+    app.dang_chay = True
+    app._t0 = time.time() - 600
+    with app._dem_lock:
+        app._dem.update({"tong": 10, "ok": 4, "loi": 1, "dung": 0})
+    app._lan_chay = {"loai": "video", "cau_hinh": {}}
+    app._chay_moc()
     t = time.time()
     while time.time() - t < 6 and len(TRANG["tin"]) == truoc:
         app.update()
         time.sleep(0.02)
-    kiem("báo cáo định kỳ tự gửi", len(TRANG["tin"]) > truoc,
+    kiem("báo cáo theo mốc tự gửi", len(TRANG["tin"]) > truoc,
          "so tin: %d" % (len(TRANG["tin"]) - truoc))
     if len(TRANG["tin"]) > truoc:
-        kiem("  tin định kỳ có nhãn bot", "Máy A" in TRANG["tin"][-1][1],
+        kiem("  tin theo mốc có nhãn bot", "Máy A" in TRANG["tin"][-1][1],
              TRANG["tin"][-1][1][:120])
-        kiem("  tin định kỳ ghi 'định kỳ'", "định kỳ" in TRANG["tin"][-1][1],
+        kiem("  tin theo mốc ghi 'theo mốc'", "theo mốc" in TRANG["tin"][-1][1],
              TRANG["tin"][-1][1][:120])
         kiem("  gửi đúng nhóm", TRANG["tin"][-1][0] == NHOM, TRANG["tin"][-1][0])
+        kiem("  có thanh tiến độ 10 ô",
+             TRANG["tin"][-1][1].count("▰") + TRANG["tin"][-1][1].count("▱") == 10,
+             TRANG["tin"][-1][1][:200])
+    # đang rảnh vẫn báo (như bản cũ) để biết tool còn sống
+    truoc = len(TRANG["tin"])
+    app.dang_chay = False
+    app._chay_moc()
+    t = time.time()
+    while time.time() - t < 4 and len(TRANG["tin"]) == truoc:
+        app.update()
+        time.sleep(0.02)
+    kiem("đang rảnh vẫn báo theo mốc", len(TRANG["tin"]) > truoc,
+         "so tin: %d" % (len(TRANG["tin"]) - truoc))
+    if len(TRANG["tin"]) > truoc:
+        kiem("  tin rảnh ghi 'Đang rảnh'", "Đang rảnh" in TRANG["tin"][-1][1],
+             TRANG["tin"][-1][1][:160])
 
     # ---- dong tool khi long-poll dang giu ket noi 8s
     app._bam_dung() if app.dang_chay else None

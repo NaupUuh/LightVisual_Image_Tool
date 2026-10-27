@@ -329,3 +329,42 @@ Go `/tonghop@bot` rieng tung con thi duoc.
 - Nut **"Kiem tra quyen"** trong hop thoai Telegram de kiem tra lai bat cu luc nao
 
 **Cach kiem tra:** `python tests/test_quyen_nhom.py` -> PASS 16 | FAIL 0
+
+## 5h — v1.0.19: bao cao theo MOC DONG HO :00/:30 + dong toc do (2026-10-27)
+
+**Yeu cau:** "vao moc phut :00 va phut :30 thi se bao cao"; dong tien do them
+" - Da them 30 video trong 30p" (lay hien tai tru du lieu 30p truoc).
+
+**Da lam:**
+- `tele.giay_toi_moc(buoc_phut)` — so giay toi moc dong ho ke tiep. `30` -> :00/:30,
+  `60` -> :00, `15` -> :00/:15/:30/:45.
+- `_hen_moc()` hen `after()` dung moc; `_chay_moc()` gui xong tu hen moc ke.
+  Hen lai khi luu hop thoai Telegram. Go bo phan bao dinh ky cu trong `_giam_sat_nghe`.
+- `BaoCao(moi_giay=10**8)` — tat tu dong gui tin tien do cua `core/tele.py`, chi con
+  nhanh moc dong ho lo viec bao cao (tranh 2 nguon bao trung nhau).
+- `_moc_ghi()` luu moc `(gio, so viec xong)` moi lan 1 viec ket thuc, giu ~2 gio.
+- `_toc_do_truot(cua_so)` + `_dong_toc_do(don_vi)` — chen ` - Da them N video trong Mp`
+  vao dong thanh tien do. Don vi tu doi anh/video; chua du 30s du lieu thi bo dong.
+- Doi nhan o nhap: "Moc bao cao (phut: 30 = :00/:30)".
+- Emoji thong nhat `⏸️` o ca 3 cho (dang chay / ket thuc / luot gan nhat).
+- `after_cancel` ca `_aid_moc` va `_aid_hen` khi tat tool.
+
+**Format bao cao moi (dang chay):**
+```
+🏷 @adungg_bot
+📊 Báo cáo theo yêu cầu
+▰▰▰▰▰▰▱▱▱▱  137/240 - Đã thêm 30 video trong 30p
+✅ OK 133   ❌ Lỗi 4   ⏸️ Dừng 0
+⏱️ Đã chạy 1h31p · còn khoảng 1h08p
+⚡️ 40.1s/việc
+```
+
+**Kiem chung:** 12 bo test — **300 PASS / 0 FAIL** (them `tests/test_moc_toc_do.py` 36 case:
+moc :00/:30, gioi han cua so, don vi anh/video, thanh 10 o, ca rong).
+`test_dong_app.py` len 17 case (do thoi gian tat + bao theo moc).
+
+**Can tranh:**
+- KHONG de 2 nguon cung gui bao cao dinh ky (BaoCao.moi_giay + `_hen_moc`) -> tin trung.
+- `_moc_dem` phai reset khi bat dau luot chay moi (da lam trong `_bam_chay`), khong thi
+  dong "Da them" se tinh lan ca luot truoc.
+- Moc dung dong ho that: doi `tele_moi_phut` = 60 thi chi bao :00, khong phai :30.

@@ -183,3 +183,27 @@ Cach 2:
 Sau do go /tonghop tran: MOI bot trong nhom deu bao cao, khong can @ten_bot.
 
 Trong tool: bam "Kiem tra quyen" de xem bot da du quyen chua.
+
+## 6f — Bao cao theo MOC DONG HO (:00 va :30)
+
+Tool KHONG con bao kieu "cu 30 phut ke tu luc bat tool". Thay vao do bao DUNG
+moc dong ho: phut :00 va phut :30 (vi du 12:00, 12:30, 13:00...).
+
+- O nhap "Moc bao cao (phut: 30 = :00/:30)": de 30 -> :00/:30; de 60 -> :00;
+  de 15 -> :00/:15/:30/:45.
+- Nhieu may cung 1 nhom se bao CUNG LUC, de doi chieu.
+- Van bao ca khi dang ranh ("Dang ranh" + luot gan nhat) de biet tool con song.
+- Muon xem ngay, khong doi moc: go /baocao trong nhom.
+
+Dong tien do co them TOC DO THUC cua nhung phut vua roi:
+    ▰▰▰▰▰▰▱▱▱▱  137/240 - Da them 30 video trong 30p
+Lay so viec xong BAY GIO tru so viec xong o moc 30 phut truoc. Neu luot chay moi
+bat dau chua du 30 giay thi khong hien dong nay (tranh so rac).
+
+Vi du tin bao cao day du:
+    🏷 @adungg_bot
+    📊 Báo cáo theo yêu cầu
+    ▰▰▰▰▰▰▱▱▱▱  137/240 - Đã thêm 30 video trong 30p
+    ✅ OK 133   ❌ Lỗi 4   ⏸️ Dừng 0
+    ⏱️ Đã chạy 1h31p · còn khoảng 1h08p
+    ⚡️ 40.1s/việc

@@ -19,7 +19,7 @@ import traceback
 import webbrowser
 from tkinter import filedialog, messagebox, ttk
 
-APP_VERSION = "1.0.18"
+APP_VERSION = "1.0.19"
 APP_TEN = "LightVisual Image Tool"
 
 THU_MUC_GOC = os.path.dirname(os.path.abspath(__file__))
@@ -144,7 +144,10 @@ class App(tk.Tk):
         self._tt_file = os.path.join(THU_MUC_GOC, "tiep_tuc.json")
         self.bc = None             # đối tượng báo cáo Telegram (core/tele.py)
         self.td = None             # theo dõi lệnh /baocao trong nhóm
-        self._lan_hb = time.time()  # mốc lần báo cáo định kỳ gần nhất
+        self._aid_moc = None       # id after() đang hẹn mốc báo cáo :00/:30
+        self._aid_hen = None       # id after() hẹn _hen_moc lần đầu lúc mở tool
+        self._moc_dem = []         # [(thời điểm, số việc đã xong)] — tính tốc độ trượt
+        self._moc_dem_lock = threading.Lock()
 
         self.title("%s v%s" % (APP_TEN, APP_VERSION))
         self.geometry("1240x820")
@@ -160,6 +163,8 @@ class App(tk.Tk):
             self.after(600, self._bat_theo_doi)
         # canh luồng nghe: nếu chết thì tự bật lại (30s/lần)
         self.after(30000, self._giam_sat_nghe)
+        # hẹn báo cáo đúng mốc đồng hồ (:00 và :30) ngay từ lúc mở tool
+        self._aid_hen = self.after(1500, self._hen_moc)
 
     # ------------------------------------------------------------ style
     def _dung_style(self):
@@ -1438,7 +1443,7 @@ class App(tk.Tk):
 
         f = ttk.Frame(w)
         f.grid(row=8, column=0, columnspan=2, sticky="ew", padx=16, pady=(4, 0))
-        ttk.Label(f, text="Gửi tiến độ mỗi (phút)").pack(side="left")
+        ttk.Label(f, text="Mốc báo cáo (phút: 30 = :00/:30)").pack(side="left")
         sp_phut = tk.Spinbox(f, from_=1, to=240, width=6, bg=NEN2, fg=CHU,
                              buttonbackground=NEN2, relief="flat", justify="center")
         sp_phut.pack(side="left", padx=(8, 20))
@@ -1538,8 +1543,8 @@ class App(tk.Tk):
                     ten.pop(c, None)
             self.cfg["tele_nhom_ten"] = ten
             luu_cfg(self.cfg)
-            self._lan_hb = time.time()
             self._dung_baocao()
+            self._hen_moc()          # căn lại mốc :00/:30 theo nhịp vừa lưu
             self._cap_nhat_tele_label()
             if self.cfg["tele_bat"] and self.cfg.get("tele_nghe"):
                 self._bat_theo_doi()
@@ -1673,7 +1678,10 @@ class App(tk.Tk):
             phut = int(self.cfg.get("tele_moi_phut") or 30)
         except Exception:
             phut = 30
-        self.bc = tele.BaoCao(tok, "", moi_giay=phut * 60, chat_ids=ds,
+        # Báo cáo định kỳ do _hen_moc lo (rơi đúng mốc :00 / :30), nên ở đây
+        # đặt nhịp rất lớn để BaoCao KHÔNG tự gửi thêm tin tiến độ nào.
+        _ = phut        # giữ đọc cấu hình để phát hiện giá trị rác sớm
+        self.bc = tele.BaoCao(tok, "", moi_giay=10 ** 8, chat_ids=ds,
                               log=lambda s: self.ui_q.put(("log", s)),
                               nhan=self._nhan_bot())
         self.bc.bat_dau_worker()
@@ -1722,27 +1730,7 @@ class App(tk.Tk):
                     self._bat_theo_doi()
         except Exception:
             pass
-        # nhịp báo cáo định kỳ: mỗi `tele_moi_phut` phút, KỂ CẢ KHI RẢNH.
-        # Nhiều máy cùng 1 nhóm -> mỗi máy tự báo, tin nào cũng có nhãn riêng.
-        try:
-            if self.cfg.get("tele_bat") and self._ds_chat_nhan():
-                try:
-                    phut = int(self.cfg.get("tele_moi_phut") or 30)
-                except Exception:
-                    phut = 30
-                if time.time() - getattr(self, "_lan_hb", 0) >= max(60, phut * 60):
-                    self._lan_hb = time.time()
-                    # nếu 30 phút qua đã có tin báo cáo nào gửi đi (đang chạy việc,
-                    # bấm dừng, trả lời lệnh) thì thôi — tránh spam thêm tin rỗng.
-                    da_gui = getattr(self.bc, "da_gui", 0)
-                    if da_gui and da_gui != getattr(self, "_hb_da_gui", -1):
-                        self._hb_da_gui = da_gui
-                    else:
-                        self._hb_da_gui = da_gui
-                        for cid in self._ds_chat_nhan():
-                            self._gui_bao_cao(cid, "định kỳ", "⏱ Báo cáo định kỳ")
-        except Exception:
-            pass
+        # báo cáo định kỳ do _hen_moc lo (rơi đúng mốc :00 / :30) — không lặp ở đây
         try:
             self.after(30000, self._giam_sat_nghe)
         except Exception:
@@ -1912,9 +1900,122 @@ class App(tk.Tk):
         """Lệnh khác (/trangthai, /giup) — chạy trong luồng polling -> đẩy vào UI."""
         self.ui_q.put(("tele_lenh_khac", (str(chat_id), ten or "", str(lenh))))
 
-    def _soan_bao_cao(self):
+    # ------------------------------------------------ mốc đồng hồ + tốc độ
+    def _moc_ghi(self, xong=None):
+        """Ghi lại (thời điểm, số việc đã xong) mỗi lần có việc xong.
+
+        Giữ tối đa ~2 giờ để tính tốc độ trượt "Đã thêm N video trong Mp"
+        mà không phình bộ nhớ khi chạy 1000+ việc.
+        """
+        now = time.time()
+        if xong is None:
+            with self._dem_lock:
+                d = dict(self._dem)
+            xong = d["ok"] + d["loi"] + d.get("dung", 0)
+        with self._moc_dem_lock:
+            self._moc_dem.append((now, int(xong)))
+            # cắt bớt mốc cũ hơn 2 giờ
+            while len(self._moc_dem) > 2 and now - self._moc_dem[0][0] > 7200:
+                self._moc_dem.pop(0)
+            if len(self._moc_dem) > 4000:
+                del self._moc_dem[:len(self._moc_dem) - 4000]
+
+    def _toc_do_truot(self, cua_so=1800):
+        """(số việc thêm được, số giây thực) trong `cua_so` giây gần nhất.
+
+        Lấy dữ liệu HIỆN TẠI trừ dữ liệu `cua_so` giây trước — đúng cách anh
+        muốn: không phải trung bình từ đầu lượt, nên thấy được máy đang chậm
+        hay nhanh lên.
+        """
+        with self._dem_lock:
+            d = dict(self._dem)
+        xong_now = d["ok"] + d["loi"] + d.get("dung", 0)
+        now = time.time()
+        with self._moc_dem_lock:
+            ds = list(self._moc_dem)
+        if not ds:
+            return 0, 0
+        # mốc gần nhất cách đây >= cua_so giây; không có thì lấy mốc cũ nhất
+        goc = None
+        for t, x in ds:
+            if now - t >= cua_so:
+                goc = (t, x)
+            else:
+                break
+        if goc is None:
+            goc = ds[0]
+        giay = now - goc[0]
+        if giay < 30:            # chưa đủ dữ liệu để nói tốc độ
+            return 0, 0
+        return max(0, xong_now - goc[1]), giay
+
+    def _dong_toc_do(self, don_vi="video"):
+        """Dòng ' - Đã thêm 30 video trong 30p' (rỗng nếu chưa đủ dữ liệu).
+
+        Cửa sổ = đúng nhịp báo cáo (tele_moi_phut, mặc định 30 phút): lấy số
+        việc hiện tại trừ số việc ở mốc trước đó để ra tốc độ THẬT của 30p
+        vừa rồi, không phải trung bình từ đầu lượt.
+        """
+        try:
+            cua_so = max(60, int(self.cfg.get("tele_moi_phut") or 30) * 60)
+        except Exception:
+            cua_so = 1800
+        them, giay = self._toc_do_truot(cua_so)
+        if them <= 0 or giay < 30:
+            return ""
+        return " - Đã thêm %d %s trong %s" % (them, don_vi,
+                                             tele.dinh_dang_phut(giay))
+
+    def _don_vi(self):
+        loai = (self._lan_chay or {}).get("loai") or "anh"
+        return "video" if loai == "video" else "ảnh"
+
+    def _hen_moc(self):
+        """Hẹn lần báo cáo kế tiếp rơi ĐÚNG mốc đồng hồ (:00 và :30)."""
+        try:
+            if self._aid_moc:
+                self.after_cancel(self._aid_moc)
+        except Exception:
+            pass
+        try:
+            if self._aid_hen:
+                self.after_cancel(self._aid_hen)
+        except Exception:
+            pass
+        self._aid_moc = None
+        self._aid_hen = None
+        if getattr(self, "_thoat", False):
+            return
+        try:
+            phut = int(self.cfg.get("tele_moi_phut") or 30)
+        except Exception:
+            phut = 30
+        con = tele.giay_toi_moc(phut)
+        try:
+            self._aid_moc = self.after(int(max(1, con) * 1000), self._chay_moc)
+        except Exception:
+            self._aid_moc = None
+
+    def _chay_moc(self):
+        """Đã tới mốc :00/:30 — gửi báo cáo rồi hẹn mốc kế tiếp.
+
+        Giữ như bản cũ: báo cả khi đang rảnh (tin "Đang rảnh" + lượt gần nhất)
+        để còn biết tool đang sống.
+        """
+        self._aid_moc = None
+        try:
+            if (not getattr(self, "_thoat", False) and self.cfg.get("tele_bat")
+                    and self._ds_chat_nhan()):
+                for cid in self._ds_chat_nhan():
+                    self._gui_bao_cao(cid, "theo mốc", "📊 Báo cáo theo mốc")
+        except Exception:
+            traceback.print_exc()
+        self._hen_moc()
+
+    def _soan_bao_cao(self, tieu_de=""):
         """Soạn nội dung báo cáo hiện tại. Chỉ đọc dữ liệu thường (không đụng Tk)
         nên gọi được từ luồng polling — cửa sổ đã đóng bot vẫn trả lời được."""
+        td = tieu_de or "<b>📊 Báo cáo theo yêu cầu</b>"
         with self._dem_lock:
             d = dict(self._dem)
         if self.dang_chay:
@@ -1922,25 +2023,26 @@ class App(tk.Tk):
             xong = d["ok"] + d["loi"] + d.get("dung", 0)
             con = max(0, d["tong"] - xong)
             tb = (giay / xong) if xong else 0
-            dong = ["<b>📊 Báo cáo theo yêu cầu</b>",
-                    "%s  %d/%d" % (tele.thanh_tien_do(d), xong, d["tong"]),
-                    "✅ OK %d   ❌ Lỗi %d   ⏸ Dừng %d"
+            dong = [td,
+                    "%s  %d/%d%s" % (tele.thanh_tien_do(d), xong, d["tong"],
+                                     self._dong_toc_do(self._don_vi())),
+                    "✅ OK %d   ❌ Lỗi %d   ⏸️ Dừng %d"
                     % (d["ok"], d["loi"], d.get("dung", 0)),
-                    "⏱ Đã chạy %s · còn khoảng %s"
+                    "⏱️ Đã chạy %s · còn khoảng %s"
                     % (tele.dinh_dang_giay(giay),
                        tele.dinh_dang_giay(tb * con) if con else "0s")]
             if xong:
-                dong.append("⚡ %.1fs/việc" % tb)
+                dong.append("⚡️ %.1fs/việc" % tb)
             return "\n".join(dong)
         cu = getattr(self, "_lan_cuoi", None) or {}
-        dong = ["<b>📊 Báo cáo theo yêu cầu</b>", "🟢 Đang rảnh — không có việc nào chạy."]
+        dong = [td, "🟢 Đang rảnh — không có việc nào chạy."]
         if cu:
             dong.append("")
             dong.append("<b>Lượt gần nhất</b>")
             dong.append("%s  %d/%d" % (tele.thanh_tien_do(cu),
                                       cu.get("ok", 0) + cu.get("loi", 0) + cu.get("dung", 0),
                                       cu.get("tong", 0)))
-            dong.append("✅ OK %d   ❌ Lỗi %d   ⏸ Dừng %d"
+            dong.append("✅ OK %d   ❌ Lỗi %d   ⏸️ Dừng %d"
                         % (cu.get("ok", 0), cu.get("loi", 0), cu.get("dung", 0)))
             if cu.get("giay"):
                 dong.append("⏱ Tổng %s" % tele.dinh_dang_giay(cu["giay"]))
@@ -1957,11 +2059,9 @@ class App(tk.Tk):
             self.ui_q.put(("log", "Telegram: chưa có bot token — không trả lời."))
             return False
         try:
-            text = self._soan_bao_cao()
+            text = self._soan_bao_cao(("<b>%s</b>" % tieu_de) if tieu_de else "")
         except Exception:
             text = "<b>📊 Báo cáo</b>\n(không đọc được số liệu)"
-        if tieu_de:
-            text = "<b>%s</b>\n%s" % (tieu_de, text.split("\n", 1)[-1])
         text = tele.nhan_tin(text, self._nhan_bot())
         self.ui_q.put(("log", "Telegram: %s — gửi báo cáo tới %s."
                        % (tieu_de or "theo yêu cầu", ten or chat_id)))
@@ -1974,19 +2074,19 @@ class App(tk.Tk):
 
     def _tra_loi_baocao(self, chat_id, ten):
         """Soạn và gửi báo cáo ngay cho 1 nhóm (chạy ở luồng GUI)."""
+        td = "<b>📊 Báo cáo theo yêu cầu</b>"
         if self.dang_chay:
-            text = self._tin_tien_do()
-            text = "<b>📊 Báo cáo theo yêu cầu</b>\n" + text.split("\n", 1)[-1]
+            text = self._tin_tien_do(td)
         else:
             cu = getattr(self, "_lan_cuoi", None) or {}
-            dong = ["<b>📊 Báo cáo theo yêu cầu</b>", "Hiện không có việc nào đang chạy."]
+            dong = [td, "Hiện không có việc nào đang chạy."]
             if cu:
                 dong.append("")
                 dong.append("<b>Lượt gần nhất</b>")
                 dong.append("%s  %d/%d" % (tele.thanh_tien_do(cu),
                                           cu.get("ok", 0) + cu.get("loi", 0) + cu.get("dung", 0),
                                           cu.get("tong", 0)))
-                dong.append("✅ OK %d   ❌ Lỗi %d   ⏸ Dừng %d"
+                dong.append("✅ OK %d   ❌ Lỗi %d   ⏸️ Dừng %d"
                             % (cu.get("ok", 0), cu.get("loi", 0), cu.get("dung", 0)))
                 if cu.get("giay"):
                     dong.append("⏱ Tổng %s" % tele.dinh_dang_giay(cu["giay"]))
@@ -2024,7 +2124,7 @@ class App(tk.Tk):
                                 % (cu.get("ok", 0) + cu.get("loi", 0) + cu.get("dung", 0),
                                    cu.get("tong", 0), cu.get("ok", 0), cu.get("loi", 0)))
             dong.append("")
-            dong.append("Nhóm nhận báo cáo: <b>%d</b> · mỗi <b>%s</b> phút"
+            dong.append("Nhóm nhận báo cáo: <b>%d</b> · báo theo mốc <b>%s</b> phút (:00/:30)"
                         % (len(self._ds_chat_nhan()), self.cfg.get("tele_moi_phut", 30)))
             text = "\n".join(dong)
         else:
@@ -2045,26 +2145,10 @@ class App(tk.Tk):
                 self.ui_q.put(("log", "Telegram: không trả lời được /%s — %s" % (lenh, loi)))
         threading.Thread(target=chay, daemon=True).start()
 
-    def _tin_tien_do(self):
-        """Soạn nội dung tin tiến độ hiện tại."""
-        with self._dem_lock:
-            d = dict(self._dem)
-        loai = (self._lan_chay or {}).get("loai") or "anh"
-        giay = time.time() - self._t0 if self._t0 else 0
-        xong = d["ok"] + d["loi"] + d.get("dung", 0)
-        con = max(0, d["tong"] - xong)
-        tb = (giay / xong) if xong else 0
-        con_lai = tb * con
-        dong = [
-            "<b>LightVisual — đang chạy</b>",
-            "%s  %d/%d" % (tele.thanh_tien_do(d), xong, d["tong"]),
-            "✅ OK %d   ❌ Lỗi %d   ⏸ Dừng %d" % (d["ok"], d["loi"], d.get("dung", 0)),
-            "⏱ Đã chạy %s · còn khoảng %s" % (tele.dinh_dang_giay(giay),
-                                              tele.dinh_dang_giay(con_lai) if con else "0s"),
-        ]
-        if xong:
-            dong.append("⚡ %.1fs/việc" % tb)
-        return "\n".join(dong)
+    def _tin_tien_do(self, tieu_de=None):
+        """Soạn nội dung tin tiến độ hiện tại (dùng chung 1 nơi với _soan_bao_cao)."""
+        td = tieu_de or "<b>LightVisual — đang chạy</b>"
+        return self._soan_bao_cao(td)
 
     # ------------------------------------------------ log / ui queue
     def _log(self, s):
@@ -2138,9 +2222,8 @@ class App(tk.Tk):
                  (dem["ok"] + dem["loi"] + dem.get("dung", 0), dem["tong"],
                   dem["ok"], dem["loi"], dem.get("dung", 0),
                   time.time() - self._t0))
-        # đẩy tin tiến độ vào hàng đợi; core/tele.py tự chặn tần suất
-        if self.bc and self.bc.enabled:
-            self.bc.tien_do(self._tin_tien_do())
+        # KHÔNG đẩy tin tiến độ nữa: báo cáo định kỳ do _hen_moc lo, rơi đúng
+        # mốc :00 / :30. Đẩy mỗi việc xong chỉ làm đầy hàng đợi rồi bị bỏ.
 
     def _dem_dung(self):
         with self._dem_lock:
@@ -3061,6 +3144,8 @@ class App(tk.Tk):
         self.dang_chay = True
         self.dung_co = False
         self._t0 = time.time()
+        with self._moc_dem_lock:
+            self._moc_dem = [(self._t0, len(self._da_xong))]
         self.btn_chay.configure(state="disabled")
         self.btn_dung.configure(state="normal")
         self.btn_tiep.configure(state="disabled")
@@ -3115,7 +3200,7 @@ class App(tk.Tk):
                 "Luồng: %d (mỗi API key 1 luồng)\n"
                 "Thư mục ra: <code>%s</code>\n"
                 "Nhóm nhận báo cáo: <b>%d</b>\n"
-                "Sẽ báo lại mỗi %d phút. Gõ /baocao trong nhóm để xem ngay."
+                "Sẽ báo đúng mốc :00 và :30 (nhịp %d phút). Gõ /baocao trong nhóm để xem ngay."
                 % (APP_VERSION, ten_loai, mo_ta, len(viec), len(da_xong),
                    len(keys), tele.esc(cau_hinh.get("thu_muc", "")),
                    len(self._ds_chat_nhan()),
@@ -3124,6 +3209,7 @@ class App(tk.Tk):
     def _ket_thuc_viec(self):
         with self._dem_lock:
             d = dict(self._dem)
+        self._moc_ghi()                 # ghi mốc để tính "Đã thêm N trong Mp"
         self.ui_q.put(("dem", d))
         if d["ok"] + d["loi"] + d["dung"] >= d["tong"]:
             ch = (self._lan_chay or {}).get("cau_hinh") or {}
@@ -3230,7 +3316,7 @@ class App(tk.Tk):
                 "<b>LightVisual v%s — KẾT THÚC</b>" % APP_VERSION,
                 "%s  %d/%d" % (tele.thanh_tien_do(d),
                                d["ok"] + d["loi"] + d.get("dung", 0), d["tong"]),
-                "✅ OK %d   ❌ Lỗi %d   ⏸ Dừng %d" % (d["ok"], d["loi"], d.get("dung", 0)),
+                "✅ OK %d   ❌ Lỗi %d   ⏸️ Dừng %d" % (d["ok"], d["loi"], d.get("dung", 0)),
                 "⏱ Tổng %s · %.1fs/việc" % (tele.dinh_dang_giay(giay), tb),
             ]
             if con:
@@ -3341,6 +3427,15 @@ class App(tk.Tk):
             self.dung_co = True
         # chặn watchdog bật lại luồng nghe trong lúc đang đóng
         self._thoat = True
+        try:
+            if self._aid_moc:
+                self.after_cancel(self._aid_moc)
+                self._aid_moc = None
+            if getattr(self, "_aid_hen", None):
+                self.after_cancel(self._aid_hen)
+                self._aid_hen = None
+        except Exception:
+            pass
         try:
             if self._aid:
                 self.after_cancel(self._aid)
