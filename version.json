@@ -1,4 +1,4 @@
 {
-  "version": "1.0.17",
-  "notes": "1.0.17 — Tắt tool KHÔNG còn treo (0.03s thay vì chờ 45s). Báo cáo định kỳ mỗi 30 phút kể cả khi rảnh. Lệnh /tonghop cho cả nhóm cùng báo cáo. Nhớ username bot vào config."
+  "version": "1.0.18",
+  "notes": "1.0.18 — Tool TU KIEM TRA quyen bot trong nhom: neu bot chua la admin va privacy mode dang BAT thi Telegram KHONG giao lenh tran /tonghop, /baocao (day la ly do 3 bot im lang). Tool bao ro trong log + gui 1 tin canh bao vao nhom kem cach sua 3 buoc. Nut 'Kiem tra quyen' trong hop thoai Telegram."
 }

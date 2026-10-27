@@ -344,6 +344,52 @@ def lenh_nao(text, bot_username=""):
     return phan.strip().lower()
 
 
+def kiem_tra_quyen(token, chat_ids):
+    """Kiem tra bot co nhan duoc lenh TRAN (/baocao, /tonghop) trong tung nhom khong.
+
+    Telegram chi giao lenh tran khi bot LA ADMIN nhom, hoac da TAT privacy mode.
+    Bot thuong + privacy BAT => chi nhan dang /lenh@<bot_username>.
+
+    Tra (danh_sach, privacy_off). Moi nhom:
+        {"id","title","status","la_admin","doc_het","loi","bot_user"}
+    """
+    token = (token or "").strip()
+    ds = []
+    privacy_off = False
+    bot_user = ""
+    bot_id = 0
+    if not token:
+        return ds, privacy_off
+    ok, me = get_me(token)
+    if ok and isinstance(me, dict):
+        privacy_off = bool(me.get("can_read_all_group_messages"))
+        bot_user = str(me.get("username") or "")
+        try:
+            bot_id = int(me.get("id") or 0)
+        except Exception:
+            bot_id = 0
+    for cid in (chat_ids or []):
+        cid = str(cid or "").strip()
+        if not cid:
+            continue
+        d = {"id": cid, "title": cid, "status": "", "la_admin": False,
+             "doc_het": False, "loi": "", "bot_user": bot_user}
+        okc, ch = goi(token, "getChat", {"chat_id": cid}, timeout=15)
+        if okc and isinstance(ch, dict):
+            d["title"] = str(ch.get("title") or ch.get("username") or cid)
+        okm, cm = goi(token, "getChatMember",
+                      {"chat_id": cid, "user_id": bot_id}, timeout=15)
+        if okm and isinstance(cm, dict):
+            d["status"] = str(cm.get("status") or "")
+            d["la_admin"] = d["status"] in ("administrator", "creator")
+        else:
+            d["loi"] = str(cm if not isinstance(cm, dict)
+                           else (cm.get("description") or cm))[:160]
+        d["doc_het"] = bool(d["la_admin"] or privacy_off)
+        ds.append(d)
+    return ds, privacy_off
+
+
 def lay_nhom(token, giay=10.0, offset=0, log=None):
     """Quét getUpdates trong `giay` giây, gom nhóm/kênh bot đang ở.
 

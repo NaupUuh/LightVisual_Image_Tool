@@ -305,3 +305,27 @@ chỉ đẩy vào `ui_q` — cửa sổ đóng mà tiến trình còn sống v�
   `after()` trên cửa sổ đã huỷ.
 - `goi()` phân biệt `tham_so=None` (GET) và `tham_so={}` (POST) — đừng dùng
   `if tham_so:` vì `{}` là falsy, `getMe` sẽ thành GET.
+
+## 5g — v1.0.18: bot im lang khi go /tonghop tran (2026-10-27)
+
+**Trieu chung:** 3 bot cung chay trong 1 nhom, go `/tonghop` tran -> khong bot nao tra loi.
+Go `/tonghop@bot` rieng tung con thi duoc.
+
+**Nguyen nhan da xac minh (khong phai loi code):**
+- `getMe()` -> `can_read_all_group_messages = False` (privacy mode BAT)
+- `getChatMember()` -> `status = member` (bot KHONG phai admin)
+- Tai lieu Telegram: *"Privacy mode is enabled by default for all bots, except bots that
+  were added to a group as admins (bot admins always receive all messages)"*
+  => Bot thuong + privacy BAT CHI nhan `/lenh@<bot_username>`, khong nhan lenh tran.
+
+**Cach sua (lam 1 lan, phia Telegram cua anh):**
+1. Nhom -> Manage -> Administrators -> Add Admin -> chon bot (CACH CHAC NHAT, khong can tat privacy)
+2. Hoac: @BotFather -> `/setprivacy` -> chon bot -> **Disable** -> **xoa bot khoi nhom roi them lai**
+   (doi privacy chi co hieu luc sau khi them lai)
+
+**Tool lam gi (v1.0.18):**
+- `tele.kiem_tra_quyen(token, chat_ids)` -> `(ds, privacy_off)`; moi nhom: status, la_admin, doc_het, loi
+- `_kiem_tra_quyen_nghe()` chay sau khi bat nghe -> log ro + gui 1 tin canh bao vao nhom (1 lan/nhom/phien)
+- Nut **"Kiem tra quyen"** trong hop thoai Telegram de kiem tra lai bat cu luc nao
+
+**Cach kiem tra:** `python tests/test_quyen_nhom.py` -> PASS 16 | FAIL 0

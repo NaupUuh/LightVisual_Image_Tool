@@ -19,7 +19,7 @@ import traceback
 import webbrowser
 from tkinter import filedialog, messagebox, ttk
 
-APP_VERSION = "1.0.17"
+APP_VERSION = "1.0.18"
 APP_TEN = "LightVisual Image Tool"
 
 THU_MUC_GOC = os.path.dirname(os.path.abspath(__file__))
@@ -1457,6 +1457,8 @@ class App(tk.Tk):
         h = ttk.Frame(w)
         h.grid(row=10, column=0, columnspan=2, sticky="ew", padx=16, pady=14)
         ttk.Button(h, text="Gửi thử", command=lambda: thu()).pack(side="left")
+        ttk.Button(h, text="Kiểm tra quyền",
+                   command=lambda: kiem_quyen()).pack(side="left", padx=(8, 0))
         ttk.Button(h, text="Lưu", command=lambda: luu()).pack(side="right")
         ttk.Button(h, text="Huỷ", command=w.destroy).pack(side="right", padx=(0, 8))
         w.columnconfigure(1, weight=1)
@@ -1473,7 +1475,7 @@ class App(tk.Tk):
             u = self._ten_bot_that()
             if u:
                 lbl_lenh.configure(
-                    text="Lệnh dùng trong nhóm:  /baocao@%s   ·   /trangthai@%s"
+                    text="Lệnh dùng trong nhóm:\n/baocao@%s   ·   /tonghop@%s\n                         (privacy mode BẬT thì lệnh TRẦN không tới được bot)"
                          % (u, u), foreground=XANH)
             else:
                 lbl_lenh.configure(
@@ -1571,6 +1573,40 @@ class App(tk.Tk):
                     if not ok:
                         loi.append("%s: %s" % (cid, l))
                 self.ui_q.put(("tele_thu", (not loi, "; ".join(loi), "%d nhóm" % len(ds))))
+            threading.Thread(target=chay, daemon=True).start()
+
+        def kiem_quyen():
+            """Kiem tra bot co nhan duoc lenh TRAN trong tung nhom khong."""
+            tok = lay_tok()
+            ds, sai = doc_ids()
+            if not tok:
+                lbl.configure(text="Thiếu bot token.", foreground=DO)
+                return
+            if not ds:
+                lbl.configure(text="Nhập ít nhất 1 ID nhóm để kiểm tra.", foreground=DO)
+                return
+            lbl.configure(text="Đang kiểm tra quyền bot trong nhóm…", foreground=CHU_MO)
+
+            def chay():
+                try:
+                    kq, _pv = tele.kiem_tra_quyen(tok, ds)
+                except Exception as e:
+                    self.ui_q.put(("tele_quyen", (False, "Lỗi kiểm tra: %s" % e)))
+                    return
+                dong = []
+                for d in kq:
+                    u = d.get("bot_user") or ""
+                    at = ("@" + u) if u else "<tên_bot>"
+                    if d.get("loi"):
+                        dong.append("• %s: không kiểm tra được (%s)"
+                                    % (d.get("title"), d["loi"]))
+                    elif d.get("doc_het"):
+                        dong.append("• %s: OK — gõ /baocao trần được." % d.get("title"))
+                    else:
+                        dong.append("• %s: CHẶN lệnh trần — dùng /baocao%s hoặc "
+                                    "/tonghop%s, hoặc thêm bot làm admin nhóm."
+                                    % (d.get("title"), at, at))
+                self.ui_q.put(("tele_quyen", (True, "\n".join(dong) or "Chưa có nhóm nào.")))
             threading.Thread(target=chay, daemon=True).start()
 
         self._hop_tele_ctl = {"lbl": lbl, "tok": e_tok, "id": e_id}
@@ -1712,6 +1748,86 @@ class App(tk.Tk):
         except Exception:
             pass
 
+    def _bao_quyen_nhom(self, chat_id, ten, at, la_admin):
+        """Gửi 1 tin cảnh báo vào nhóm khi bot KHÔNG nhận được lệnh trần.
+
+        Tin do bot GỬI ĐI luôn tới nhóm (privacy mode chỉ chặn chiều NHẬN),
+        nên đây là cách duy nhất để anh đọc được cảnh báo ngay trên điện thoại.
+        Mỗi nhóm chỉ gửi 1 lần trong 1 phiên để không spam.
+        """
+        da = getattr(self, "_da_bao_quyen", None)
+        if da is None:
+            da = self._da_bao_quyen = set()
+        if str(chat_id) in da:
+            return
+        da.add(str(chat_id))
+        tok = (self.cfg.get("tele_token") or "").strip()
+        if not tok:
+            return
+        ly_do = ("bot đang là <b>admin</b> nhưng vẫn bị chặn" if la_admin
+                 else "bot <b>CHƯA phải admin</b> + privacy mode đang <b>BẬT</b>")
+        text = ("<b>⚠ Bot này chưa nhận được lệnh trần</b>\n"
+                "Nhóm: <b>%s</b>\n"
+                "Bot: %s — %s\n\n"
+                "<b>Cách sửa (làm 1 lần, 30 giây):</b>\n"
+                "1. Mở @BotFather → gõ <code>/setprivacy</code> → chọn bot này → "
+                "<b>Disable</b>\n"
+                "2. Xoá bot khỏi nhóm rồi thêm lại (bắt buộc — đổi privacy chỉ có "
+                "hiệu lực sau khi thêm lại)\n"
+                "3. Hoặc: nhóm → Manage → Administrators → Add Admin → chọn bot này\n\n"
+                "<i>Sau đó gõ /tonghop trần là MỌI bot trong nhóm cùng báo cáo.</i>"
+                % (tele.esc(ten or chat_id), tele.esc(at), ly_do))
+
+        def chay():
+            ok, loi = tele.gui(tok, str(chat_id), text)
+            self.ui_q.put(("log", "Telegram: %s cảnh báo quyền tới \"%s\"."
+                           % ("đã gửi" if ok else "KHÔNG gửi được", ten or chat_id)))
+            if not ok:
+                self.ui_q.put(("log", "Telegram: lỗi gửi cảnh báo — %s" % loi))
+        threading.Thread(target=chay, daemon=True).start()
+
+    def _kiem_tra_quyen_nghe(self):
+        """Kiem tra bot co nhan duoc lenh TRAN trong nhom khong — chay o luong nen.
+
+        Privacy mode BAT + bot KHONG phai admin => Telegram KHONG giao /baocao
+        hay /tonghop tran cho bot. Nguoi dung go lenh tran se thay bot im lang va
+        tuong tool hong. Phai noi ro cach xu ly ngay trong log.
+        """
+        tok = (self.cfg.get("tele_token") or "").strip()
+        ds_chat = self._ds_chat_nhan()
+        if not tok or not ds_chat:
+            return
+
+        def chay():
+            try:
+                ds, _pv = tele.kiem_tra_quyen(tok, ds_chat)
+            except Exception as e:
+                self.ui_q.put(("log", "Telegram: không kiểm tra được quyền bot — %s" % e))
+                return
+            for d in ds:
+                u = d.get("bot_user") or ""
+                at = ("@" + u) if u else "<tên_bot>"
+                ten = d.get("title") or d.get("id")
+                if d.get("loi"):
+                    self.ui_q.put(("log", "Telegram: nhóm \"%s\" — không kiểm tra được "
+                                          "quyền (%s)." % (ten, d["loi"])))
+                elif d.get("doc_het"):
+                    self.ui_q.put(("log", "Telegram: nhóm \"%s\" — bot %s nhận được MỌI tin "
+                                          "(admin=%s). Gõ /baocao trần OK."
+                                   % (ten, at, "có" if d.get("la_admin") else "không")))
+                else:
+                    self.ui_q.put(("log",
+                        "⚠ Telegram: nhóm \"%s\" — bot %s CHƯA là admin và đang BẬT "
+                        "privacy mode nên Telegram KHÔNG giao lệnh trần. Gõ /baocao hay "
+                        "/tonghop trần SẼ KHÔNG AI TRẢ LỜI. Dùng /baocao%s hoặc "
+                        "/tonghop%s — hoặc thêm bot làm admin nhóm (Manage → "
+                        "Administrators → Add Admin) là gõ trần được."
+                        % (ten, at, at, at)))
+                    # báo thẳng vào nhóm để anh đọc được trên điện thoại
+                    self._bao_quyen_nhom(d.get("id"), ten, at, bool(d.get("la_admin")))
+
+        threading.Thread(target=chay, daemon=True).start()
+
     # -- nghe lệnh /baocao
     def _bat_theo_doi(self):
         # chỉ nghe lệnh bằng token anh tự nhập; KHÔNG dùng token .env Hermes
@@ -1746,6 +1862,7 @@ class App(tk.Tk):
                         except Exception:
                             pass
                     self.ui_q.put(("log", "Telegram: đang nghe lệnh /baocao trong nhóm."))
+                    self._kiem_tra_quyen_nghe()
             finally:
                 self._dang_doi_bat = False
 
@@ -1978,6 +2095,18 @@ class App(tk.Tk):
                     self._tra_loi_baocao(*gt)
                 elif loai == "tele_lenh_khac":
                     self._tra_loi_lenh_khac(*gt)
+                elif loai == "tele_quyen":
+                    hop = getattr(self, "_hop_tele_ctl", None)
+                    if hop:
+                        try:
+                            hop["lbl"].configure(
+                                text=gt[1], justify="left",
+                                foreground=XANH if gt[0] else DO)
+                        except tk.TclError:
+                            pass
+                    for dong in str(gt[1]).split("\n"):
+                        if dong.strip():
+                            self._log("Telegram: %s" % dong.strip())
                 elif loai == "dem_tc":
                     self._cap_nhat_dem_tham_chieu()
                 elif loai == "key_chet":

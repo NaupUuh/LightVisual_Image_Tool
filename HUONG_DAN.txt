@@ -164,3 +164,22 @@ LightVisual_Image_Tool\
 - **`/tonghop`**: nhờ **tất cả máy** trong nhóm cùng báo cáo — mỗi máy trả lời 1 tin
   có nhãn riêng. Dùng khi không nhớ tên bot nào.
 - Cửa sổ tool đã đóng nhưng tiến trình còn sống: bot **vẫn trả lời** `/baocao`.
+
+## 6e — Nhieu bot 1 nhom: go /tonghop tran khong ai tra loi
+
+Day la gioi han cua Telegram, khong phai loi tool.
+
+Bot chi nhan duoc lenh TRAN (/tonghop, /baocao khong co @ten_bot) khi:
+  - bot la ADMIN cua nhom, HOAC
+  - bot da TAT privacy mode VA da duoc them lai vao nhom
+
+Cach 1 (nhanh nhat, khong can tat privacy):
+  Nhom -> Manage -> Administrators -> Add Admin -> chon bot
+
+Cach 2:
+  @BotFather -> /setprivacy -> chon bot -> Disable
+  -> XOA bot khoi nhom -> them lai (bat buoc)
+
+Sau do go /tonghop tran: MOI bot trong nhom deu bao cao, khong can @ten_bot.
+
+Trong tool: bam "Kiem tra quyen" de xem bot da du quyen chua.
