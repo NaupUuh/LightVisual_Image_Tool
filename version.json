@@ -1,4 +1,4 @@
 {
-  "version": "1.0.19",
-  "notes": "1.0.19 — Bao cao roi DUNG MOC DONG HO: phut :00 va :30 (khong con 'moi N phut ke tu luc bat tool', nen nhieu may cung nhom se bao cung luc). Dong tien do co them toc do THUC cua nhung phut vua roi: '... 137/240 - Da them 30 video trong 30p' (lay so viec xong hien tai tru so viec xong o moc 30 phut truoc). O nhap nhip doi nhan thanh 'Moc bao cao (phut: 30 = :00/:30)'."
+  "version": "1.0.20",
+  "notes": "1.0.20 - Nhom Telegram nang cap len supergroup (Telegram doi chat_id, bao 'group chat was upgraded to a supergroup chat') thi tool TU DOI ID moi va luu vao config.json, khong bao gio mat bao cao nua. Truoc day moi tin gui deu loi HTTP 400 va tool dung han viec bao cao. Van giu: bao cao dung moc :00/:30 + dong toc do 'Da them N video trong Mp'."
 }

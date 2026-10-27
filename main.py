@@ -19,7 +19,7 @@ import traceback
 import webbrowser
 from tkinter import filedialog, messagebox, ttk
 
-APP_VERSION = "1.0.19"
+APP_VERSION = "1.0.20"
 APP_TEN = "LightVisual Image Tool"
 
 THU_MUC_GOC = os.path.dirname(os.path.abspath(__file__))
@@ -1652,6 +1652,57 @@ class App(tk.Tk):
             ds.append(c)
         return ds
 
+    def _dong_bo_migrate(self):
+        """Nhóm nâng cấp lên supergroup -> thay ID cũ bằng ID mới trong config.
+
+        Telegram đổi chat_id khi nhóm thường thành supergroup; nếu không cập
+        nhật thì mọi tin gửi đi đều 400 "group chat was upgraded".
+        """
+        try:
+            mg = tele.lay_migrate()
+        except Exception:
+            return
+        if not mg:
+            return
+        doi = False
+        ids = []
+        for x in (self.cfg.get("tele_chat_ids") or []):
+            x = str(x or "").strip()
+            if not x:
+                continue
+            moi = mg.get(x, x)
+            if moi != x:
+                doi = True
+            if moi not in ids:
+                ids.append(moi)
+        c = str(self.cfg.get("tele_chat_id") or "").strip()
+        if c and mg.get(c):
+            c = mg[c]
+            doi = True
+            if c not in ids:
+                ids.append(c)
+        if not doi:
+            return
+        self.cfg["tele_chat_ids"] = ids
+        if c:
+            self.cfg["tele_chat_id"] = c
+        nhom_ten = self.cfg.get("tele_nhom_ten") or {}
+        if isinstance(nhom_ten, dict):
+            moi_ten = {}
+            for k, v in nhom_ten.items():
+                moi_ten[mg.get(str(k), str(k))] = v
+            self.cfg["tele_nhom_ten"] = moi_ten
+        luu_cfg(self.cfg)
+        try:
+            self._log("Telegram: nhóm đã lên supergroup — tự đổi ID sang %s."
+                      % ", ".join(ids))
+        except Exception:
+            pass
+        try:
+            self._cap_nhat_tele_label()
+        except Exception:
+            pass
+
     def _dung_baocao(self, nhanh=False):
         """nhanh=True: báo dừng, không chờ gửi nốt (dùng khi đóng tool)."""
         if self.bc:
@@ -2158,6 +2209,10 @@ class App(tk.Tk):
         self.txt_log.configure(state="disabled")
 
     def _xu_ly_ui_q(self):
+        try:
+            self._dong_bo_migrate()
+        except Exception:
+            pass
         try:
             while True:
                 loai, gt = self.ui_q.get_nowait()

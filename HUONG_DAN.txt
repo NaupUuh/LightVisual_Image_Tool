@@ -207,3 +207,11 @@ Vi du tin bao cao day du:
     ✅ OK 133   ❌ Lỗi 4   ⏸️ Dừng 0
     ⏱️ Đã chạy 1h31p · còn khoảng 1h08p
     ⚡️ 40.1s/việc
+
+
+## 6g — Nhóm Telegram báo "upgraded to a supergroup chat"
+
+Telegram tự đổi ID nhóm (thường thành dạng `-100...`) khi nhóm được nâng cấp.
+Tool **tự phát hiện và đổi ID mới**, lưu vào `config.json`, không cần làm gì.
+Nếu log vẫn báo lỗi này quá 1 lần: bấm **Kiểm tra quyền** trong hộp thoại
+Telegram để tool đọc lại nhóm, rồi gửi lại báo cáo.

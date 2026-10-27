@@ -31,6 +31,11 @@ LOAI_NHOM = ("group", "supergroup", "channel")
 LOAI_GOI = ("message", "edited_message", "channel_post", "edited_channel_post",
             "my_chat_member", "chat_member", "chat_join_request")
 
+# Nhóm thường (-5593791314) khi được nâng cấp lên supergroup sẽ đổi ID thành
+# -1004471871974. Telegram trả 400 kèm parameters.migrate_to_chat_id ⇒ ghi lại
+# ánh xạ ở đây để main.py lưu vào config.json (người dùng không phải sửa tay).
+_MIGRATE = {}
+
 
 # ---------------------------------------------------------------- tiện ích
 def thu_muc_hermes():
@@ -95,6 +100,12 @@ def _mo_ta_loi(ma, d, mac_dinh="Telegram từ chối"):
     if "terminated by other getupdates" in low or "conflict" in low:
         return ("HTTP %s: token này đang bị chương trình khác đọc getUpdates "
                 "(409 Conflict). Tắt bot đó hoặc dùng token bot riêng." % ma)
+    if "upgraded to a supergroup" in low or "migrate_to_chat_id" in low:
+        moi = _migrate_tu(d)
+        if moi:
+            return ("HTTP %s: nhóm đã nâng cấp lên supergroup — ID mới %s "
+                    "(tool tự chuyển)." % (ma, moi))
+        return "HTTP %s: nhóm đã nâng cấp lên supergroup, cần ID mới." % ma
     if "chat not found" in low:
         return "HTTP %s: không thấy chat — bot chưa được add vào nhóm?" % ma
     if "bot was blocked" in low:
@@ -102,6 +113,40 @@ def _mo_ta_loi(ma, d, mac_dinh="Telegram từ chối"):
     if "not enough rights" in low:
         return "HTTP %s: bot thiếu quyền gửi tin trong nhóm." % ma
     return "HTTP %s: %s" % (ma, mo_ta[:200])
+
+
+def _migrate_tu(d):
+    """Lấy chat_id mới trong parameters.migrate_to_chat_id (nếu có)."""
+    try:
+        p = (d or {}).get("parameters") or {}
+        moi = p.get("migrate_to_chat_id")
+        if moi:
+            return str(moi)
+    except Exception:
+        pass
+    return ""
+
+
+def lay_migrate():
+    """Trả dict {id_cu: id_moi} đã gặp trong phiên này (main.py lưu vào config)."""
+    return dict(_MIGRATE)
+
+
+def _ghi_migrate(tham_so, d):
+    """Ghi lại cặp (chat_id cũ -> mới) khi Telegram báo nhóm lên supergroup."""
+    try:
+        moi = _migrate_tu(d)
+        if not moi:
+            return
+        cu = ""
+        if isinstance(tham_so, dict):
+            cu = str(tham_so.get("chat_id") or "").strip()
+        if cu and cu != moi:
+            _MIGRATE[cu] = moi
+    except Exception:
+        pass
+
+
 
 
 def goi(token, method, tham_so=None, timeout=25):
@@ -130,7 +175,9 @@ def goi(token, method, tham_so=None, timeout=25):
             raw = e.read()
         except Exception:
             pass
-        return False, _mo_ta_loi(e.code, _doc_json(raw) or {})
+        d = _doc_json(raw) or {}
+        _ghi_migrate(tham_so, d)
+        return False, _mo_ta_loi(e.code, d)
     except Exception as e:
         return False, str(e)[:200]
 
@@ -182,13 +229,23 @@ def get_me(token):
 
 
 def gui(token, chat_id, text, timeout=20):
-    """Gửi 1 tin nhắn. Trả (ok, mô_tả_lỗi)."""
+    """Gửi 1 tin nhắn. Trả (ok, mô_tả_lỗi).
+
+    Nếu nhóm đã nâng cấp lên supergroup, Telegram trả 400 kèm
+    parameters.migrate_to_chat_id ⇒ gửi lại ngay bằng ID mới.
+    """
     token = lay_token(token)
     chat_id = str(chat_id or "").strip()
     if not token:
         return False, "chưa có bot token"
     if not chat_id:
         return False, "chưa có chat_id"
+    # đã biết nhóm lên supergroup trước đó -> gửi thẳng bằng ID mới
+    chat_id = _MIGRATE.get(chat_id, chat_id)
+    return _gui1(token, chat_id, text, timeout, thu_lai=True)
+
+
+def _gui1(token, chat_id, text, timeout, thu_lai):
     body = urllib.parse.urlencode({
         "chat_id": chat_id,
         "text": str(text or "")[:GIOI_HAN_KY_TU],
@@ -208,7 +265,16 @@ def gui(token, chat_id, text, timeout=20):
             raw = e.read()
         except Exception:
             pass
-        return False, _mo_ta_loi(e.code, _doc_json(raw) or {})
+        d = _doc_json(raw) or {}
+        moi = _migrate_tu(d)
+        if moi and thu_lai:
+            _MIGRATE[chat_id] = moi
+            ok, loi = _gui1(token, moi, text, timeout, thu_lai=False)
+            if ok:
+                return True, ""
+            return False, "nhóm đã lên supergroup (%s) nhưng gửi vẫn lỗi: %s" % (
+                moi, loi)
+        return False, _mo_ta_loi(e.code, d)
     except Exception as e:
         return False, str(e)[:200]
 

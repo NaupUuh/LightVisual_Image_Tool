@@ -368,3 +368,29 @@ moc :00/:30, gioi han cua so, don vi anh/video, thanh 10 o, ca rong).
 - `_moc_dem` phai reset khi bat dau luot chay moi (da lam trong `_bam_chay`), khong thi
   dong "Da them" se tinh lan ca luot truoc.
 - Moc dung dong ho that: doi `tele_moi_phut` = 60 thi chi bao :00, khong phai :30.
+
+
+## 5i — v1.0.20: nhóm lên supergroup thì tự đổi chat_id (2026-10-27)
+
+**Triệu chứng**: log tool hiện `Tele: gửi lỗi (-5593791314) — HTTP 400: Bad Request:
+group chat was upgraded to a supergroup chat` ⇒ mọi báo cáo/tiến độ đều mất.
+
+**Nguyên nhân**: Telegram đổi `chat_id` của nhóm thường thành dạng `-100...` khi
+nhóm được nâng cấp (bật Topics, đổi loại nhóm, đủ điều kiện...). ID cũ trả
+`getChat` vẫn "ok" nhưng mọi thao tác gửi đều 400 kèm
+`parameters.migrate_to_chat_id`. `config.json` vẫn giữ ID cũ nên tool gửi mãi vào
+địa chỉ đã chết.
+
+**Cách sửa**:
+- `core/tele.py`: thêm `_MIGRATE` + `_migrate_tu(d)` + `_ghi_migrate()` + `lay_migrate()`.
+  `gui()` gặp 400 có `migrate_to_chat_id` ⇒ **gửi lại ngay** bằng ID mới (chỉ 1 lần,
+  không lặp vô hạn). Lần sau `gui()` tự dùng ID mới luôn.
+- `main.py`: `_dong_bo_migrate()` chạy trong `_xu_ly_ui_q` — thay ID cũ bằng ID mới
+  trong `tele_chat_id`, `tele_chat_ids`, khoá `tele_nhom_ten`, rồi `luu_cfg()`.
+
+**Cách kiểm tra**: `tests/test_migrate.py` — 23 case (helper, mô tả lỗi, gửi lại,
+không lặp vô hạn, đồng bộ config, chạy 2 lần không ghi lại).
+Kiểm tra thật: `sendChatAction` vào ID mới trả `{"ok":true}`.
+
+**Tránh**: đừng chỉ sửa `config.json` bằng tay rồi thôi — lần sau nhóm đổi tiếp
+thì lại mất báo cáo. Đừng bắt user tự điền ID mới.

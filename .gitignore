@@ -7,3 +7,8 @@ __pycache__/
 *.pyc
 Image/
 _sang.py
+
+# file backup config.json co the chua token that -> khong bao gio commit
+config.json.bak*
+config.json.bak_*
+*.bak_*

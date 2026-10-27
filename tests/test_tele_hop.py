@@ -283,7 +283,16 @@ def main():
     if DEM["tin"]:
         kiem("trả lời vào đúng nhóm B", DEM["tin"][0]["chat_id"] == "-1009876543210",
              DEM["tin"][0]["chat_id"])
-    log_txt = app.txt_log.get("1.0", "end")
+    # _kiem_tra_quyen_nghe chạy ở LUỒNG NỀN nên dòng log chứa ID nhóm có thể
+    # tới muộn hơn tin trả lời -> phải chờ, đọc ngay sẽ flaky.
+    log_txt = ""
+    t0 = time.time()
+    while time.time() - t0 < 10:
+        app.update()
+        log_txt = app.txt_log.get("1.0", "end")
+        if "-1009876543210" in log_txt:
+            break
+        time.sleep(0.05)
     kiem("log ghi ID nhóm mới thấy", "-1009876543210" in log_txt,
          log_txt[-200:])
     app._dung_theo_doi()
