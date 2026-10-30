@@ -401,8 +401,9 @@ thì lại mất báo cáo. Đừng bắt user tự điền ID mới.
 **Yêu cầu**: "option lưu từng prompt theo 1 folder hoặc tất cả prompt vào chung 1 folder".
 
 **Đã làm**:
-- 2 khoá config mới: `chia_folder` (tab 1 ảnh) và `video_chia_folder` (tab 2 video),
-  mặc định `True` = giữ nguyên hành vi cũ.
+- 2 khoá config mới: `chia_folder` (tab 1 ảnh, mặc định `False` = gộp chung — đúng
+  hành vi 1.0.20) và `video_chia_folder` (tab 2 video, mặc định `True` = chia theo
+  prompt — đúng hành vi 1.0.20). Mặc định giữ y nguyên nên máy đang chạy không đổi gì.
 - Tab 1 (ảnh): `var_chia_anh`; tab 2 (video): `var_chia` — checkbox
   "Mỗi prompt 1 thư mục con (bỏ tick = gộp chung)" nằm dưới ô "Mở folder khi chạy xong".
 - `_bam_chay`: khi bật và có >1 prompt → tạo thư mục con `NN_<prompt>_<hash>` và gán

@@ -12,3 +12,6 @@ _sang.py
 config.json.bak*
 config.json.bak_*
 *.bak_*
+
+# updater ghi backup vao day -> khong commit
+_backup_update/
