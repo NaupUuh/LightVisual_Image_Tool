@@ -422,3 +422,12 @@ thì lại mất báo cáo. Đừng bắt user tự điền ID mới.
 **Tránh**: `ttk.Checkbutton` KHÔNG có option `wraplength` (chỉ `ttk.Label` có) —
 truyền vào sẽ `TclError: unknown option "-wraplength"` và app không mở được.
 Nhãn dài thì rút ngắn chữ, đừng thêm `wraplength`.
+
+## 5k - v1.0.22 (2026-10-30)
+- Nút "Nối vào hàng chờ" (`_noi_hang_cho`) trước đây lấy `chia_folder` của **lượt chạy trước**
+  (`ch_goc`) nên bỏ tick / tích tick trên GUI không có tác dụng -> kết quả ghi lạc chỗ.
+- Nay `_cau_hinh_noi()` đọc lại `var_chia` (tab video) / `var_chia_anh` (tab ảnh) **ngay lúc bấm nút**,
+  ghi đè `c["chia_folder"]` -> việc nối thêm vào đúng chỗ theo ô tick hiện tại.
+- Thư mục ra + bảng thư mục con (`thu_muc_prompt` / `thu_muc_folder`) vẫn giữ của lượt đang chạy
+  (không tách sang folder khác), chỉ đổi cách chia.
+- Test: test_gui thêm 4 case (video/ảnh x tích/bỏ tick) -> PASS 99 / FAIL 0.

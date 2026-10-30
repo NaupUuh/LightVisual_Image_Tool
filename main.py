@@ -19,7 +19,7 @@ import traceback
 import webbrowser
 from tkinter import filedialog, messagebox, ttk
 
-APP_VERSION = "1.0.21"
+APP_VERSION = "1.0.22"
 APP_TEN = "LightVisual Image Tool"
 
 THU_MUC_GOC = os.path.dirname(os.path.abspath(__file__))
@@ -3054,6 +3054,8 @@ class App(tk.Tk):
             c["res"] = self.cb_vres.get()
             c["aspect"] = self.cb_vaspect.get()
             c["nguon"] = self._nguon_dang_chon()
+            if hasattr(self, "var_chia"):
+                c["chia_folder"] = bool(self.var_chia.get())
         else:
             try:
                 c["moi"] = max(1, min(4, int(self.sp_n.get() or 1)))
@@ -3065,6 +3067,8 @@ class App(tk.Tk):
             c["quality"] = self.cb_quality.get()
             c["che_do_sua"] = bool(self._che_do_chon_luc_bam(ch))
             c["ds_anh"] = self._ds_anh_gui() if c["che_do_sua"] else []
+            if hasattr(self, "var_chia_anh"):
+                c["chia_folder"] = bool(self.var_chia_anh.get())
         return c
 
     def _noi_hang_cho(self):

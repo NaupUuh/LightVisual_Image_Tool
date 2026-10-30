@@ -229,3 +229,5 @@ Tab 1 (ảnh) và tab 2 (video) đều có checkbox:
 - BỎ TICK: tất cả ảnh/video ghi thẳng vào "Thư mục ra", không tạo thư mục con.
 
 Lựa chọn được lưu vào config.json, mở lại tool vẫn giữ nguyên.
+
+[1.0.22] Nut 'Noi vao hang cho' lay dung o tick 'Moi prompt 1 thu muc con' dang chon luc bam (truoc day lay theo luot chay truoc nen ghi lac cho).

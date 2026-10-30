@@ -410,6 +410,25 @@ def main():
     subs_g2 = [d for d in os.listdir(g_dir2) if os.path.isdir(os.path.join(g_dir2, d))]
     kiem("chia lại: tạo 2 thư mục con", len(subs_g2) == 2, str(subs_g2))
 
+    # ---- Nối hàng chờ phải theo checkbox ĐANG TÍCH lúc bấm, không theo lượt cũ
+    ch_goc_gia = {"chia_folder": True, "thu_muc": out, "thu_muc_prompt": {}}
+    app.var_chia.set(False)
+    c_noi = app._cau_hinh_noi("video", ch_goc_gia)
+    kiem("nối hàng chờ video: bỏ tick -> gộp chung",
+         c_noi.get("chia_folder") is False, str(c_noi.get("chia_folder")))
+    app.var_chia.set(True)
+    c_noi = app._cau_hinh_noi("video", ch_goc_gia)
+    kiem("nối hàng chờ video: tích -> chia theo prompt",
+         c_noi.get("chia_folder") is True, str(c_noi.get("chia_folder")))
+    app.var_chia_anh.set(True)
+    c_noi_a = app._cau_hinh_noi("anh", ch_goc_gia)
+    kiem("nối hàng chờ ảnh: tích -> chia theo prompt",
+         c_noi_a.get("chia_folder") is True, str(c_noi_a.get("chia_folder")))
+    app.var_chia_anh.set(False)
+    c_noi_a = app._cau_hinh_noi("anh", ch_goc_gia)
+    kiem("nối hàng chờ ảnh: bỏ tick -> gộp chung",
+         c_noi_a.get("chia_folder") is False, str(c_noi_a.get("chia_folder")))
+
     # ---- Bug 2026-10-25: prompt khác nhau nhưng 40 ký tự đầu giống nhau
     #      → trước đây bị cắt tên còn 40 ký tự nên gộp chung 1 thư mục
     b_dir = os.path.join(out, "_bug40")
