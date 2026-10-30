@@ -215,3 +215,17 @@ Telegram tự đổi ID nhóm (thường thành dạng `-100...`) khi nhóm đư
 Tool **tự phát hiện và đổi ID mới**, lưu vào `config.json`, không cần làm gì.
 Nếu log vẫn báo lỗi này quá 1 lần: bấm **Kiểm tra quyền** trong hộp thoại
 Telegram để tool đọc lại nhóm, rồi gửi lại báo cáo.
+
+
+## 6h — Chọn cách lưu file: mỗi prompt 1 folder hay gộp chung
+
+Tab 1 (ảnh) và tab 2 (video) đều có checkbox:
+
+    [x] Mỗi prompt 1 thư mục con (bỏ tick = gộp chung)
+
+- TICK (mặc định): mỗi prompt ra 1 thư mục con riêng trong "Thư mục ra",
+  tên dạng `01_<40 ký tự đầu của prompt>_<mã băm>`. Chạy lại đúng prompt đó
+  thì ghi tiếp vào thư mục cũ, không tạo thư mục mới.
+- BỎ TICK: tất cả ảnh/video ghi thẳng vào "Thư mục ra", không tạo thư mục con.
+
+Lựa chọn được lưu vào config.json, mở lại tool vẫn giữ nguyên.

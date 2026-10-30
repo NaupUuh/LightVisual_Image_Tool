@@ -19,7 +19,7 @@ import traceback
 import webbrowser
 from tkinter import filedialog, messagebox, ttk
 
-APP_VERSION = "1.0.20"
+APP_VERSION = "1.0.21"
 APP_TEN = "LightVisual Image Tool"
 
 THU_MUC_GOC = os.path.dirname(os.path.abspath(__file__))
@@ -47,6 +47,7 @@ DEFAULTS = {
     "so_luong": 3,
     "thu_muc_ra": os.path.join(THU_MUC_GOC, "output"),
     "mo_khi_xong": False,
+    "chia_folder": False,
     "giu_nhan_vat": True,
     # video
     "video_model": "xai/grok-imagine-video-1.5",
@@ -60,6 +61,7 @@ DEFAULTS = {
     "video_tham_chieu": "",
     "video_xoa_tham_chieu": True,
     "video_mo_khi_xong": False,
+    "video_chia_folder": True,
     # báo cáo tiến độ lên Telegram
     "tele_bat": False,
     "tele_token": "",
@@ -363,14 +365,19 @@ class App(tk.Tk):
         ttk.Checkbutton(p, text="Mở folder khi chạy xong", variable=self.var_mo,
                         command=self._luu_tuy_chon).grid(row=8, column=1, sticky="w", pady=(8, 0))
 
-        ttk.Separator(p, orient="horizontal").grid(row=9, column=0, columnspan=2,
+        self.var_chia_anh = tk.BooleanVar(value=bool(self.cfg.get("chia_folder", True)))
+        ttk.Checkbutton(p, text="Mỗi prompt 1 thư mục con (bỏ tick = gộp chung)",
+                        variable=self.var_chia_anh, command=self._luu_tuy_chon).grid(
+            row=9, column=0, columnspan=2, sticky="w", pady=(8, 0))
+
+        ttk.Separator(p, orient="horizontal").grid(row=10, column=0, columnspan=2,
                                                    sticky="ew", pady=12)
         self.lbl_chi_phi = ttk.Label(p, text="", style="Panel.TLabel",
                                      font=("Segoe UI", 10, "bold"))
-        self.lbl_chi_phi.grid(row=10, column=0, columnspan=2, sticky="w")
+        self.lbl_chi_phi.grid(row=11, column=0, columnspan=2, sticky="w")
         ttk.Label(p, text="Gói Grok Vô Hạn đang hạn thì ảnh Grok tính 0đ.",
                   style="MoPanel.TLabel", wraplength=250, justify="left").grid(
-            row=11, column=0, columnspan=2, sticky="w", pady=(6, 0))
+            row=12, column=0, columnspan=2, sticky="w", pady=(6, 0))
 
         # nạp lại tuỳ chọn đã lưu
         self._nap_tuy_chon()
@@ -431,6 +438,8 @@ class App(tk.Tk):
             "thu_muc_ra": self.e_ra.get().strip(),
             "mo_khi_xong": bool(self.var_mo.get()),
         })
+        if hasattr(self, "var_chia_anh"):
+            self.cfg["chia_folder"] = bool(self.var_chia_anh.get())
         try:
             self.cfg["so_anh"] = max(1, min(4, int(self.sp_n.get())))
         except Exception:
@@ -736,14 +745,19 @@ class App(tk.Tk):
         ttk.Checkbutton(p, text="Mở folder khi chạy xong", variable=self.var_vmo).grid(
             row=8, column=1, sticky="w", pady=(8, 0))
 
-        ttk.Separator(p, orient="horizontal").grid(row=9, column=0, columnspan=2,
+        self.var_chia = tk.BooleanVar(value=bool(self.cfg.get("video_chia_folder", True)))
+        ttk.Checkbutton(p, text="Mỗi prompt 1 thư mục con (bỏ tick = gộp chung)",
+                        variable=self.var_chia, command=self._luu_tuy_chon_video).grid(
+            row=9, column=0, columnspan=2, sticky="w", pady=(8, 0))
+
+        ttk.Separator(p, orient="horizontal").grid(row=10, column=0, columnspan=2,
                                                    sticky="ew", pady=12)
         self.lbl_phi_video = ttk.Label(p, text="", style="Panel.TLabel",
                                        font=("Segoe UI", 10, "bold"))
-        self.lbl_phi_video.grid(row=10, column=0, columnspan=2, sticky="w")
+        self.lbl_phi_video.grid(row=11, column=0, columnspan=2, sticky="w")
         ttk.Label(p, text="Gói Grok Vô Hạn đang hạn thì video Grok tính 0đ.",
                   style="MoPanel.TLabel", wraplength=250, justify="left").grid(
-            row=11, column=0, columnspan=2, sticky="w", pady=(6, 0))
+            row=12, column=0, columnspan=2, sticky="w", pady=(6, 0))
         self._doi_nguon()
 
     def _ds_anh_khung(self):
@@ -1012,6 +1026,8 @@ class App(tk.Tk):
         self.cfg["video_luong"] = len(self._ds_key()) or 1
         self.cfg["video_mc"] = self.txt_mc.get("1.0", "end").strip()
         self.cfg["video_mo_khi_xong"] = bool(self.var_vmo.get())
+        if hasattr(self, "var_chia"):
+            self.cfg["video_chia_folder"] = bool(self.var_chia.get())
         if hasattr(self, "e_thamchieu"):
             self.cfg["video_tham_chieu"] = self.e_thamchieu.get().strip()
             self.cfg["video_xoa_tham_chieu"] = bool(self.var_xtc.get())
@@ -2362,6 +2378,23 @@ class App(tk.Tk):
                 stt += 1
                 viec.append({"stt": stt, "prompt": p, "lan": j + 1, "moi": moi})
 
+        chia = bool(self.var_chia_anh.get()) if hasattr(self, "var_chia_anh") else True
+        cau_hinh["chia_folder"] = chia
+        if chia and len(ds_prompt) > 1:
+            ban_do = {}
+            for k, g in enumerate(ds_prompt):
+                ban_do[g] = self._tao_thu_muc_prompt(thu_muc, k + 1, g)
+            for v in viec:
+                v["thu_muc"] = ban_do[v["prompt"]]
+            cau_hinh["thu_muc_prompt"] = ban_do
+            self._log("Chia %d ảnh vào %d thư mục con (mỗi prompt 1 thư mục):" %
+                      (len(viec), len(ban_do)))
+            for g in ds_prompt:
+                self._log("   %s" % os.path.basename(ban_do[g]))
+        elif not chia and len(ds_prompt) > 1:
+            self._log("Đang để 'gộp chung 1 folder' — %d prompt đều ghi vào %s" %
+                      (len(ds_prompt), os.path.basename(thu_muc)))
+
         self.nb.select(2)
         self._chay_luot("anh", viec, cau_hinh)
 
@@ -2514,7 +2547,12 @@ class App(tk.Tk):
             g = v.get("prompt_goc") or v["prompt"]
             if g not in ds_goc:
                 ds_goc.append(g)
-        if nguon == api.DS_NGUON[3] and ds_don_vi:
+        chia_folder = bool(self.var_chia.get()) if hasattr(self, "var_chia") else True
+        cau_hinh["chia_folder"] = chia_folder
+        if not chia_folder and len(ds_goc) > 1:
+            self._log("Đang để 'gộp chung 1 folder' — %d prompt đều ghi vào %s" %
+                      (len(ds_goc), os.path.basename(thu_muc)))
+        if nguon == api.DS_NGUON[3] and ds_don_vi and chia_folder:
             # thư mục ra đặt theo ĐÚNG tên folder ảnh đầu vào (1 folder vào → 1 folder ra)
             ban_do = {}
             for k, d in enumerate(ds_don_vi):
@@ -2527,7 +2565,7 @@ class App(tk.Tk):
             for d in ds_don_vi:
                 self._log("   %s  ←  %s (%d ảnh)" %
                           (os.path.basename(ban_do[d["ten"]]), d["ten"], len(d["anh"])))
-        elif len(ds_goc) > 1:
+        elif chia_folder and len(ds_goc) > 1:
             ban_do = {}
             for k, g in enumerate(ds_goc):
                 ban_do[g] = self._tao_thu_muc_prompt(thu_muc, k + 1, g)
@@ -2746,7 +2784,9 @@ class App(tk.Tk):
             if not kq["anh"]:
                 raise api.LoiAPI("Máy chủ không trả ảnh.", 0, "empty")
             url, b64 = kq["anh"][0]
-            duong_dan = os.path.join(ch["thu_muc"], ten + ".png")
+            thu_ra_anh = v.get("thu_muc") or ch["thu_muc"]
+            os.makedirs(thu_ra_anh, exist_ok=True)
+            duong_dan = os.path.join(thu_ra_anh, ten + ".png")
             n = api.tai_ve(url or b64, duong_dan)
             if n < 16 or not self._la_anh(duong_dan):
                 raise api.LoiAPI("File tải về không phải ảnh (%d byte)." % n, 0, "empty")
@@ -3104,9 +3144,10 @@ class App(tk.Tk):
                     v["prompt"] = self._ghep_mc(v["mc"], g)
 
             co_folder = any(v.get("folder_vao") for v in them)
+            chia = ch.get("chia_folder", True)
             bdo_f = ch.get("thu_muc_folder")
             bdo_p = ch.get("thu_muc_prompt")
-            if co_folder:
+            if co_folder and chia:
                 if bdo_f is None:                 # lượt đang chạy chưa chia theo folder
                     bdo_f = {}
                     ch["thu_muc_folder"] = bdo_f
@@ -3123,7 +3164,7 @@ class App(tk.Tk):
                     g = v.get("prompt_goc") or ""
                     if g not in ds_goc:
                         ds_goc.append(g)
-                if bdo_p is not None or len(ds_goc) > 1:
+                if chia and (bdo_p is not None or len(ds_goc) > 1):
                     if bdo_p is None:
                         bdo_p = {}
                         ch["thu_muc_prompt"] = bdo_p
@@ -3134,10 +3175,26 @@ class App(tk.Tk):
                             bdo_p[g] = self._tao_thu_muc_prompt(ch["thu_muc"], len(bdo_p) + 1, g)
                             self._log("   thư mục mới: %s" % os.path.basename(bdo_p[g]))
                         v["thu_muc"] = bdo_p[g]
+                else:
+                    for v in them:            # gộp chung: tất cả vào thư mục ra
+                        v["thu_muc"] = ch["thu_muc"]
         else:
+            chia_a = ch.get("chia_folder", True)
+            bdo_a = ch.get("thu_muc_prompt")
             for v in them:
                 v["mc"] = ""
-                v["thu_muc"] = ch["thu_muc"]
+                g = v.get("prompt") or ""
+                if chia_a and (bdo_a is not None or len({x.get("prompt") for x in them}) > 1):
+                    if bdo_a is None:
+                        bdo_a = {}
+                        ch["thu_muc_prompt"] = bdo_a
+                        ch_goc["thu_muc_prompt"] = bdo_a
+                    if g not in bdo_a:
+                        bdo_a[g] = self._tao_thu_muc_prompt(ch["thu_muc"], len(bdo_a) + 1, g)
+                        self._log("   thư mục mới: %s" % os.path.basename(bdo_a[g]))
+                    v["thu_muc"] = bdo_a[g]
+                else:
+                    v["thu_muc"] = ch["thu_muc"]
 
         nhan = self._nhan(loai, ch)
         for v in them:

@@ -1,4 +1,5 @@
 {
-  "version": "1.0.20",
-  "notes": "1.0.20 - Nhom Telegram nang cap len supergroup (Telegram doi chat_id, bao 'group chat was upgraded to a supergroup chat') thi tool TU DOI ID moi va luu vao config.json, khong bao gio mat bao cao nua. Truoc day moi tin gui deu loi HTTP 400 va tool dung han viec bao cao. Van giu: bao cao dung moc :00/:30 + dong toc do 'Da them N video trong Mp'."
+  "version": "1.0.21",
+  "notes": "Them option 'Moi prompt 1 thu muc con' / 'gop chung 1 folder' cho ca tab anh va tab video",
+  "date": "2026-10-30"
 }

@@ -355,6 +355,61 @@ def main():
     lai = T.App._tao_thu_muc_prompt(out, 1, "FOLDER A")
     kiem("chạy lại: dùng lại thư mục cũ", os.path.basename(lai) == subs[0], os.path.basename(lai))
 
+    # ---- Option "gộp chung 1 folder": bỏ tick → mọi prompt ghi vào thư mục ra
+    g_dir = os.path.join(out, "_gop_chung")
+    os.makedirs(g_dir, exist_ok=True)
+    app.cb_vnguon.set(T.api.DS_NGUON[0])
+    app._doi_nguon()
+    app.e_vra.delete(0, "end")
+    app.e_vra.insert(0, g_dir)
+    app.txt_prompt_video.delete("1.0", "end")
+    app.txt_prompt_video.insert("1.0", "GOP A" + chr(10) + "GOP B" + chr(10))
+    app.txt_mc.delete("1.0", "end")
+    app.sp_vmoi.delete(0, "end")
+    app.sp_vmoi.insert(0, "1")
+    app.var_chia.set(False)
+    DEM["video"] = 0
+    app.cfg["api_key"] = "LV_ok"
+    app.nb.select(1)
+    app._bam_chay()
+    t0 = time.time()
+    while app.dang_chay and time.time() - t0 < 40:
+        app.update()
+        time.sleep(0.03)
+    for _ in range(30):
+        app.update()
+        time.sleep(0.02)
+    subs_g = [d for d in os.listdir(g_dir) if os.path.isdir(os.path.join(g_dir, d))]
+    kiem("gộp chung: không tạo thư mục con", subs_g == [], str(subs_g))
+    kiem("gộp chung: 2 mp4 nằm ngay trong thư mục ra",
+         len([f for f in os.listdir(g_dir) if f.endswith(".mp4")]) == 2,
+         str(os.listdir(g_dir)))
+    kiem("gộp chung: đã lưu vào config", app.cfg.get("video_chia_folder") is False,
+         str(app.cfg.get("video_chia_folder")))
+
+    # ---- Bật lại: mỗi prompt 1 thư mục con
+    app.var_chia.set(True)
+    app._luu_tuy_chon_video()
+    kiem("chia folder: đã lưu vào config", app.cfg.get("video_chia_folder") is True,
+         str(app.cfg.get("video_chia_folder")))
+    g_dir2 = os.path.join(out, "_chia_lai")
+    os.makedirs(g_dir2, exist_ok=True)
+    app.e_vra.delete(0, "end")
+    app.e_vra.insert(0, g_dir2)
+    app.cfg["api_key"] = "LV_ok"
+    app.nb.select(1)
+    DEM["video"] = 0
+    app._bam_chay()
+    t0 = time.time()
+    while app.dang_chay and time.time() - t0 < 40:
+        app.update()
+        time.sleep(0.03)
+    for _ in range(30):
+        app.update()
+        time.sleep(0.02)
+    subs_g2 = [d for d in os.listdir(g_dir2) if os.path.isdir(os.path.join(g_dir2, d))]
+    kiem("chia lại: tạo 2 thư mục con", len(subs_g2) == 2, str(subs_g2))
+
     # ---- Bug 2026-10-25: prompt khác nhau nhưng 40 ký tự đầu giống nhau
     #      → trước đây bị cắt tên còn 40 ký tự nên gộp chung 1 thư mục
     b_dir = os.path.join(out, "_bug40")

@@ -394,3 +394,30 @@ Kiểm tra thật: `sendChatAction` vào ID mới trả `{"ok":true}`.
 
 **Tránh**: đừng chỉ sửa `config.json` bằng tay rồi thôi — lần sau nhóm đổi tiếp
 thì lại mất báo cáo. Đừng bắt user tự điền ID mới.
+
+
+## 5j — v1.0.21: chọn lưu mỗi prompt 1 folder hay gộp chung 1 folder (2026-10-30)
+
+**Yêu cầu**: "option lưu từng prompt theo 1 folder hoặc tất cả prompt vào chung 1 folder".
+
+**Đã làm**:
+- 2 khoá config mới: `chia_folder` (tab 1 ảnh) và `video_chia_folder` (tab 2 video),
+  mặc định `True` = giữ nguyên hành vi cũ.
+- Tab 1 (ảnh): `var_chia_anh`; tab 2 (video): `var_chia` — checkbox
+  "Mỗi prompt 1 thư mục con (bỏ tick = gộp chung)" nằm dưới ô "Mở folder khi chạy xong".
+- `_bam_chay`: khi bật và có >1 prompt → tạo thư mục con `NN_<prompt>_<hash>` và gán
+  `v["thu_muc"]` cho từng việc; tắt → tất cả ghi thẳng vào thư mục ra.
+- `_bam_chay_video`: thêm `cau_hinh["chia_folder"]`; điều kiện chia theo folder ảnh
+  vào và theo prompt đều phải qua `chia_folder`.
+- `_noi_hang_cho`: nối thêm việc giữa lượt chạy cũng tôn trọng `chia_folder`
+  (cả nhánh ảnh và nhánh video) — nếu không, việc nối sẽ ghi lạc chỗ.
+- `_lam_mot` ghi ảnh vào `v["thu_muc"]` (trước đây luôn `ch["thu_muc"]`).
+
+**Cách kiểm tra**: `tests/test_gui.py` thêm 5 case:
+- gộp chung: không tạo thư mục con, 2 mp4 nằm ngay trong thư mục ra
+- gộp chung / chia folder: giá trị lưu đúng vào config
+- chia lại: tạo đúng 2 thư mục con
+
+**Tránh**: `ttk.Checkbutton` KHÔNG có option `wraplength` (chỉ `ttk.Label` có) —
+truyền vào sẽ `TclError: unknown option "-wraplength"` và app không mở được.
+Nhãn dài thì rút ngắn chữ, đừng thêm `wraplength`.
